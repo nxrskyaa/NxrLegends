@@ -43,6 +43,7 @@ function navTo(id) {
   if (id === 'squad') renderSquadScreen();
   if (id === 'store') renderStore();
   if (id === 'customleague') renderBuilder();
+  if (id === 'worldcup') renderWorldCup();
   if (id === 'database') renderDatabase();
   if (id === 'legend') renderLegend();
   show(id);
@@ -211,9 +212,8 @@ $('#club-name').addEventListener('change', () => {
 $('#squad-back').addEventListener('click', () => {
   SFX.nav();
   if (SQUAD_RETURN) {
-    const fx = SQUAD_RETURN;
-    SQUAD_RETURN = null;
-    showPrematch(fx);
+    SQUAD_RETURN = false;
+    showPrematch();
   } else {
     show('title');
   }
@@ -417,14 +417,25 @@ function renderNextPanel() {
     el.appendChild(cv);
     el.insertAdjacentHTML('beforeend', `<div class="nm-name">${t.name}</div><div class="nm-ovr">OVR ${Math.round(t.str)}</div>`);
   });
-  $('#btn-play').addEventListener('click', () => { SFX.click(); showPrematch(fx); });
+  $('#btn-play').addEventListener('click', () => { SFX.click(); playSeasonFixture(fx); });
+}
+
+function playSeasonFixture(fx) {
+  beginFixture({
+    homeId: fx.home, awayId: fx.away,
+    userTeamId: SEASON.user,
+    label: `MATCHDAY ${fx.md} — ${SEASON.leagueName}`,
+    knockout: false,
+    onComplete: res => seasonComplete(fx, res),
+    onBack: () => { renderHub(); show('hub'); }
+  });
 }
 
 /* ============================================================
    PRE-MATCH: SQUAD + CUSTOM TACTICS
    ============================================================ */
-let PENDING_FIXTURE = null;
-let SQUAD_RETURN = null;
+let PENDING_CTX = null;
+let SQUAD_RETURN = false;
 
 function previewXI(team) {
   if (team.id === USER_TEAM_ID) return { players: resolvedXI(), formation: COLL.formation };
@@ -454,15 +465,20 @@ function renderPreviewPitch(container, players, formationKey, colors) {
   });
 }
 
-function showPrematch(fixture) {
-  PENDING_FIXTURE = fixture;
-  const home = getTeam(fixture.home), away = getTeam(fixture.away);
-  const userTeam = getTeam(SEASON.user);
-  const oppTeam = SEASON.user === fixture.home ? away : home;
+/* generic match entry: every mode (season / custom / world cup) routes here */
+function beginFixture(ctx) {
+  PENDING_CTX = ctx;
+  showPrematch();
+}
 
-  $('#pm-md').textContent = `MATCHDAY ${fixture.md} · ${home.short} (H) v ${away.short} (A)`;
+function showPrematch() {
+  const ctx = PENDING_CTX;
+  const home = getTeam(ctx.homeId), away = getTeam(ctx.awayId);
+  const userTeam = getTeam(ctx.userTeamId);
+  const oppTeam = ctx.userTeamId === ctx.homeId ? away : home;
 
-  // versus banner
+  $('#pm-md').textContent = `${home.short} (H) v ${away.short} (A)`;
+
   const vs = $('#pm-versus');
   vs.innerHTML = '';
   [[userTeam, 'YOUR SIDE'], [oppTeam, 'OPPONENT']].forEach(([t, label], idx) => {
@@ -477,19 +493,19 @@ function showPrematch(fixture) {
     vs.appendChild(wrap);
   });
 
-  // XI preview
   const prev = previewXI(userTeam);
   $('#pm-formation').textContent = prev.formation;
   $('#pm-ovr').textContent = Math.round(userTeam.str);
   renderPreviewPitch($('#pm-pitch'), prev.players, prev.formation, userTeam.colors);
-  $('#pm-edit').style.display = SEASON.user === USER_TEAM_ID ? '' : 'none';
+  $('#pm-edit').style.display = ctx.userTeamId === USER_TEAM_ID ? '' : 'none';
 
   renderTacticsControls();
   show('prematch');
 }
 
+/* tactics live in COLL.tactics (persistent), attached to the controlled side at kickoff */
 function renderTacticsControls() {
-  const tac = SEASON.tactics;
+  const tac = COLL.tactics;
   const mSeg = $('#pm-mentality');
   mSeg.innerHTML = '';
   Object.entries(MENTALITIES).forEach(([key, m]) => {
@@ -498,7 +514,7 @@ function renderTacticsControls() {
     b.textContent = m.name;
     b.addEventListener('click', () => {
       SFX.click();
-      SEASON.tactics.mentality = key; saveSeason();
+      COLL.tactics.mentality = key; saveCollection();
       renderTacticsControls();
     });
     mSeg.appendChild(b);
@@ -513,7 +529,7 @@ function renderTacticsControls() {
     b.textContent = p.name;
     b.addEventListener('click', () => {
       SFX.click();
-      SEASON.tactics.pressing = key; saveSeason();
+      COLL.tactics.pressing = key; saveCollection();
       renderTacticsControls();
     });
     pSeg.appendChild(b);
@@ -521,14 +537,14 @@ function renderTacticsControls() {
   $('#pm-pressing-desc').textContent = PRESSING[tac.pressing].desc;
 }
 
-$('#pm-back').addEventListener('click', () => { SFX.nav(); renderHub(); show('hub'); });
+$('#pm-back').addEventListener('click', () => { SFX.nav(); (PENDING_CTX.onBack || (() => show('title')))(); });
 $('#pm-edit').addEventListener('click', () => {
   SFX.nav();
-  SQUAD_RETURN = PENDING_FIXTURE;
+  SQUAD_RETURN = true;
   renderSquadScreen();
   show('squad');
 });
-$('#pm-kickoff').addEventListener('click', () => { SFX.whistle(); startMatch(PENDING_FIXTURE); });
+$('#pm-kickoff').addEventListener('click', () => { SFX.whistle(); startMatch(); });
 
 function renderTablePanel() {
   const table = computeTable(SEASON.teams, SEASON.fixtures);
@@ -577,19 +593,41 @@ function renderSquadPanel() {
    MATCH PLAYBACK
    ============================================================ */
 let MATCH = null;
+const SPEEDS = [1, 2, 4];
+const SPEED_MS = { 1: 640, 2: 300, 4: 120 };
 
-function startMatch(fixture) {
-  const home = getTeam(fixture.home), away = getTeam(fixture.away);
-  // apply the season's custom tactics to whichever side the manager controls
-  if (SEASON.user === fixture.home) home.tactics = SEASON.tactics;
-  else if (SEASON.user === fixture.away) away.tactics = SEASON.tactics;
-  const sim = simulateMatch(home, away);
+/* starting XI: user club uses the exact resolved XI, others use best XI */
+function startingEleven(team) {
+  return team.id === USER_TEAM_ID ? [...team.squadFull] : bestXI(team.squadFull);
+}
+
+function computeBench(team, onPitch) {
+  const onIds = new Set(onPitch.map(p => p.pid).filter(Boolean));
+  const pool = team.id === USER_TEAM_ID ? ownedPlayers() : team.squadFull;
+  return pool.filter(p => p.pid && !onIds.has(p.pid)).sort((a, b) => b.ovr - a.ovr);
+}
+
+function startMatch() {
+  const ctx = PENDING_CTX;
+  const home = getTeam(ctx.homeId), away = getTeam(ctx.awayId);
+  // attach the manager's custom tactics to whichever side they control
+  if (ctx.userTeamId === ctx.homeId) home.tactics = { ...COLL.tactics };
+  else if (ctx.userTeamId === ctx.awayId) away.tactics = { ...COLL.tactics };
+
+  const homeXI = startingEleven(home), awayXI = startingEleven(away);
+  const live = new LiveMatch(home, away, homeXI, awayXI);
+  const userSide = ctx.userTeamId === ctx.homeId ? 'home' : ctx.userTeamId === ctx.awayId ? 'away' : null;
+  const userTeam = userSide ? getTeam(ctx.userTeamId) : null;
+  const userXI = userSide === 'home' ? homeXI : awayXI;
+
   MATCH = {
-    fixture, home, away, sim,
-    minute: 0, hg: 0, ag: 0, evIdx: 0,
-    speed: 1, timer: null,
+    ctx, home, away, live, userSide, userTeam, userXI,
+    bench: userSide ? computeBench(userTeam, userXI) : [],
+    subsLeft: 3, minute: 0, events: [], speed: 1, paused: false, finished: false,
+    timer: null, raf: null,
     scene: new MatchScene($('#pitch'), home, away)
   };
+
   [['#sb-home', home], ['#sb-away', away]].forEach(([sel, t]) => {
     const el = $(sel); el.innerHTML = '';
     const cv = document.createElement('canvas');
@@ -602,6 +640,9 @@ function startMatch(fixture) {
   $('#sb-clock').textContent = "00'";
   $('#commentary').innerHTML = '<p>The referee blows the whistle — we are LIVE!</p>';
   $('#btn-speed').textContent = 'SPEED x1';
+  $('#btn-subs').style.display = userSide ? '' : 'none';
+  updateSubsButton();
+  closeSubPanel();
   show('match');
   runMatchLoop();
 }
@@ -609,25 +650,24 @@ function startMatch(fixture) {
 function runMatchLoop() {
   cancelAnimationFrame(MATCH.raf);
   clearInterval(MATCH.timer);
-  const msPerMin = () => MATCH.speed === 1 ? 420 : 140;
   function animate() {
     MATCH.scene.tick();
     MATCH.scene.render();
     MATCH.raf = requestAnimationFrame(animate);
   }
   animate();
-  MATCH.timer = setInterval(() => stepMinute(), msPerMin());
+  MATCH.timer = setInterval(stepMinute, SPEED_MS[MATCH.speed]);
 }
 
 function stepMinute() {
   const M = MATCH;
-  M.minute++;
+  if (M.paused || M.finished) return;
+  const evs = M.live.step();
+  M.minute = M.live.min;
   $('#sb-clock').textContent = String(M.minute).padStart(2, '0') + "'";
-  while (M.evIdx < M.sim.events.length && M.sim.events[M.evIdx].min <= M.minute) {
-    applyEvent(M.sim.events[M.evIdx++], true);
-  }
-  if (M.minute >= 90) finishMatch();
-  else if (M.minute % 15 === 0) {
+  evs.forEach(e => applyEvent(e, true));
+  if (M.live.done()) { finishMatch(); return; }
+  if (M.minute % 15 === 0) {
     logLine(pick([
       'The pixel crowd starts a wave...',
       'Tactical shouting from the dugout.',
@@ -639,15 +679,15 @@ function stepMinute() {
 
 function applyEvent(ev, live) {
   const M = MATCH;
+  M.events.push(ev);
   if (ev.type === 'goal') {
-    if (ev.side === 'home') M.hg++; else M.ag++;
-    $('#sb-score-h').textContent = M.hg;
-    $('#sb-score-a').textContent = M.ag;
+    $('#sb-score-h').textContent = M.live.hg;
+    $('#sb-score-a').textContent = M.live.ag;
     if (live) {
       M.scene.goal(ev.side);
       if (ev.player && ev.player.legend) SFX.legend(); else SFX.goal();
     }
-    logLine(`${ev.min}' ${ev.text}`, ev.player && ev.player.legend ? 'legend' : 'goal');
+    logLine(`${ev.min}' ${ev.text}`, ev.player && (ev.player.legend || ev.player.icon) ? 'legend' : 'goal');
   } else if (ev.type === 'chance') {
     logLine(`${ev.min}' ${ev.text}`, 'chance');
     if (live && Math.random() < 0.5) M.scene.setAttack(ev.side);
@@ -667,74 +707,178 @@ function logLine(text, cls) {
 
 $('#btn-speed').addEventListener('click', () => {
   SFX.click();
-  MATCH.speed = MATCH.speed === 1 ? 2 : 1;
+  const i = SPEEDS.indexOf(MATCH.speed);
+  MATCH.speed = SPEEDS[(i + 1) % SPEEDS.length];
   $('#btn-speed').textContent = 'SPEED x' + MATCH.speed;
   runMatchLoop();
 });
 
 $('#btn-skip').addEventListener('click', () => {
   SFX.click();
-  while (MATCH.evIdx < MATCH.sim.events.length) applyEvent(MATCH.sim.events[MATCH.evIdx++], false);
+  MATCH.paused = false;
+  closeSubPanel();
+  while (!MATCH.live.done()) MATCH.live.step().forEach(e => applyEvent(e, false));
   MATCH.minute = 90;
   finishMatch();
 });
 
+/* ---- substitutions ---- */
+function updateSubsButton() {
+  const btn = $('#btn-subs');
+  btn.textContent = `SUBS (${MATCH.subsLeft})`;
+  btn.disabled = MATCH.subsLeft <= 0;
+}
+
+$('#btn-subs').addEventListener('click', () => {
+  if (MATCH.subsLeft <= 0) return;
+  SFX.click();
+  MATCH.paused = true;
+  SUB_OUT = null;
+  renderSubPanel();
+  $('#sub-panel').classList.remove('hidden');
+});
+$('#sub-close').addEventListener('click', () => { SFX.click(); closeSubPanel(); });
+function closeSubPanel() {
+  $('#sub-panel').classList.add('hidden');
+  if (MATCH && !MATCH.finished) { MATCH.paused = false; }
+}
+
+let SUB_OUT = null; // pid selected to come off
+
+function renderSubPanel() {
+  const M = MATCH;
+  $('#sub-title').textContent = `SUBSTITUTIONS — ${M.subsLeft} LEFT` + (SUB_OUT ? ' · NOW PICK WHO COMES ON' : ' · TAP A PLAYER TO SUB OFF');
+  // on pitch
+  const onBox = $('#sub-onpitch');
+  onBox.innerHTML = '<div class="sub-col-head">ON PITCH</div>';
+  M.userXI.forEach(p => {
+    if (!p.pid) return; // academy filler can't be subbed meaningfully
+    const row = subRow(p, SUB_OUT === p.pid);
+    row.addEventListener('click', () => {
+      SFX.click();
+      SUB_OUT = SUB_OUT === p.pid ? null : p.pid;
+      renderSubPanel();
+    });
+    onBox.appendChild(row);
+  });
+  // bench
+  const benchBox = $('#sub-bench');
+  benchBox.innerHTML = '<div class="sub-col-head">BENCH</div>';
+  if (!M.bench.length) benchBox.insertAdjacentHTML('beforeend', '<p class="px-label">NO BENCH PLAYERS</p>');
+  M.bench.forEach(p => {
+    const row = subRow(p, false);
+    row.classList.toggle('sub-disabled', !SUB_OUT);
+    row.addEventListener('click', () => {
+      if (!SUB_OUT) return;
+      makeSub(SUB_OUT, p.pid);
+    });
+    benchBox.appendChild(row);
+  });
+}
+
+function subRow(p, selected) {
+  const row = document.createElement('button');
+  row.className = 'chooser-row' + (selected ? ' sub-selected' : '');
+  const cv = document.createElement('canvas');
+  drawFace(cv, p, MATCH.userTeam.colors, 26);
+  row.appendChild(cv);
+  row.insertAdjacentHTML('beforeend',
+    `<span>${p.name}${p.legend ? ' ★' : p.icon ? ' ⚜' : ''}</span><span class="cr-ovr">${p.pos} ${p.ovr}</span>`);
+  return row;
+}
+
+function makeSub(outPid, inPid) {
+  const M = MATCH;
+  const outIdx = M.userXI.findIndex(p => p.pid === outPid);
+  const inIdx = M.bench.findIndex(p => p.pid === inPid);
+  if (outIdx === -1 || inIdx === -1) return;
+  const outP = M.userXI[outIdx], inP = M.bench[inIdx];
+  M.userXI[outIdx] = inP;        // mutate live XI in place (LiveMatch holds this ref)
+  M.bench.splice(inIdx, 1, outP);
+  M.bench.sort((a, b) => b.ovr - a.ovr);
+  M.subsLeft--;
+  SFX.whistle();
+  logLine(`${M.minute}' SUB (${M.userTeam.short}): ${inP.name} ON, ${outP.name} OFF`, 'card');
+  SUB_OUT = null;
+  updateSubsButton();
+  if (M.subsLeft <= 0) closeSubPanel();
+  else renderSubPanel();
+}
+
+/* ---- finish + generic result ---- */
 function finishMatch() {
   const M = MATCH;
+  M.finished = true;
   clearInterval(M.timer);
   cancelAnimationFrame(M.raf);
+  closeSubPanel();
   SFX.whistle();
-  M.fixture.played = true;
-  M.fixture.hg = M.sim.hg;
-  M.fixture.ag = M.sim.ag;
-  SEASON.fixtures.filter(f => !f.played && f.md === M.fixture.md &&
+  const res = { hg: M.live.hg, ag: M.live.ag, events: M.events, home: M.home, away: M.away };
+  if (M.ctx.knockout && res.hg === res.ag) {
+    const pens = penaltyShootout(M.home, M.away);
+    res.pens = pens;
+    res.winnerSide = pens.winner;
+  } else {
+    res.winnerSide = res.hg > res.ag ? 'home' : res.hg < res.ag ? 'away' : null;
+  }
+  M.ctx.onComplete(res);
+}
+
+let RESULT_CONTINUE = null;
+
+function showResult(o) {
+  $('#result-headline').textContent = o.state === 'win' ? '🏆 VICTORY!' : o.state === 'loss' ? '💔 DEFEAT' : 'ALL SQUARE';
+  $('#result-headline').style.color = o.state === 'win' ? 'var(--gold)' : o.state === 'loss' ? 'var(--red)' : 'var(--cyan)';
+  $('#result-score').innerHTML =
+    `${o.homeName}<span class="big-score">${o.hg} — ${o.ag}</span>${o.awayName}` +
+    (o.pensLine ? `<div style="font-size:10px;color:var(--cyan);margin-top:-6px">${o.pensLine}</div>` : '');
+  $('#result-scorers').innerHTML = o.scorers && o.scorers.length ? o.scorers.join('<br>') : 'NO GOALS — A DEFENSIVE MASTERCLASS?';
+  $('#result-coins').textContent = o.coinLine || '';
+  $('#result-streak').innerHTML = (o.infoLines || []).join('<br>');
+  RESULT_CONTINUE = o.onContinue;
+  show('result');
+}
+
+function resultScorers(res) {
+  return res.events.filter(e => e.type === 'goal')
+    .map(e => `${e.min}' ${e.player.name} (${e.side === 'home' ? res.home.short : res.away.short})${e.player.legend ? ' ★' : e.player.icon ? ' ⚜' : ''}`);
+}
+
+/* season mode completion */
+function seasonComplete(fx, res) {
+  fx.played = true; fx.hg = res.hg; fx.ag = res.ag;
+  SEASON.fixtures.filter(f => !f.played && f.md === fx.md &&
     f.home !== SEASON.user && f.away !== SEASON.user).forEach(f => {
       const s = simulateMatch(getTeam(f.home), getTeam(f.away));
       f.played = true; f.hg = s.hg; f.ag = s.ag;
     });
   saveSeason();
-  renderResult();
-  show('result');
-}
 
-function renderResult() {
-  const M = MATCH;
-  const isUserHome = M.fixture.home === SEASON.user;
-  const userInMatch = isUserHome || M.fixture.away === SEASON.user;
-  const ug = isUserHome ? M.sim.hg : M.sim.ag;
-  const og = isUserHome ? M.sim.ag : M.sim.hg;
+  const isUserHome = fx.home === SEASON.user;
+  const ug = isUserHome ? res.hg : res.ag, og = isUserHome ? res.ag : res.hg;
   const won = ug > og, drew = ug === og;
+  const earned = matchReward(won, drew, ug);
+  SFX.coin();
 
-  $('#result-headline').textContent = won ? '🏆 VICTORY!' : drew ? 'ALL SQUARE' : '💔 DEFEAT';
-  $('#result-headline').style.color = won ? 'var(--gold)' : drew ? 'var(--cyan)' : 'var(--red)';
-  $('#result-score').innerHTML = `${M.home.name}<span class="big-score">${M.sim.hg} — ${M.sim.ag}</span>${M.away.name}`;
+  const um = userMatches(), r = userRecord();
+  let streak;
+  if (r.l === 0 && r.d === 0) streak = `★ PERFECT: ${r.played}/${r.played} WINS — ${um.length - r.played} TO GO FOR ${um.length}-0 ★`;
+  else if (r.l === 0) streak = `UNBEATEN IN ${r.played} — INVINCIBLE VIBES`;
+  else streak = `RECORD: ${r.w}W ${r.d}D ${r.l}L`;
 
-  const scorers = M.sim.events.filter(e => e.type === 'goal')
-    .map(e => `${e.min}' ${e.player.name} (${e.side === 'home' ? M.home.short : M.away.short})${e.player.legend ? ' ★' : ''}`);
-  $('#result-scorers').innerHTML = scorers.length ? scorers.join('<br>') : 'NO GOALS — A DEFENSIVE MASTERCLASS?';
-
-  // coin reward for the user's match
-  let coinMsg = '';
-  if (userInMatch) {
-    const earned = matchReward(won, drew, ug);
-    coinMsg = `+${earned} ◉ EARNED — BALANCE ${COLL.coins.toLocaleString('en-US')} ◉`;
-    SFX.coin();
-  }
-  $('#result-coins').textContent = coinMsg;
-
-  const um = userMatches();
-  const r = userRecord();
-  let streakMsg = '';
-  if (r.l === 0 && r.d === 0) streakMsg = `★ PERFECT: ${r.played} WINS / ${r.played} GAMES — ${um.length - r.played} TO GO FOR ${um.length}-0 ★`;
-  else if (r.l === 0) streakMsg = `UNBEATEN IN ${r.played} — INVINCIBLE VIBES`;
-  else streakMsg = `RECORD: ${r.w}W ${r.d}D ${r.l}L`;
-  $('#result-streak').textContent = streakMsg;
+  showResult({
+    state: won ? 'win' : drew ? 'draw' : 'loss',
+    homeName: res.home.name, awayName: res.away.name, hg: res.hg, ag: res.ag,
+    scorers: resultScorers(res),
+    coinLine: `+${earned} ◉ EARNED — BALANCE ${COLL.coins.toLocaleString('en-US')} ◉`,
+    infoLines: [streak],
+    onContinue: () => { renderHub(); show('hub'); }
+  });
 }
 
 $('#btn-continue').addEventListener('click', () => {
   SFX.nav();
-  renderHub();
-  show('hub');
+  if (RESULT_CONTINUE) RESULT_CONTINUE();
 });
 
 /* ============================================================

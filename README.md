@@ -8,6 +8,8 @@ Open gacha packs, build your ultimate squad, take on the English league in a per
 - 🎴 **Gacha Store** — Bronze / Silver / Gold / Legend packs with animated pixel card reveals. Duplicates auto-convert to coins. NXRSKYAA hides in Gold (1.5%) and Legend (5%) packs.
 - 🧩 **My Squad** — build your club from your collection: pick a formation (4-4-2, 4-3-3, 3-5-2, 5-3-2), place players slot by slot on a vertical pixel pitch, auto best XI, rename your club, sell spares.
 - 🏆 **The 38-0 Challenge** — your squad + 19 English league clubs (Arsenal, Liverpool, Man City, Chelsea, Spurs and more, each seeded with their real stars), home & away, 38 matches. Win them all.
+- 🏆 **World Cup mode** — pick your nation and fight through a 16-team single-elimination bracket (Round of 16 → Quarters → Semis → Final). Level after 90 minutes? Straight to a **penalty shootout**. Full live bracket view.
+- 🔄 **Live match + substitutions** — matches are simulated live minute-by-minute, so your **3 substitutions** and tactic tweaks actually change what happens next. Speed control (x1 / x2 / x4) and skip.
 - 🎽 **Team Talk (pre-match)** — before every kick-off, review your starting XI on the pitch, jump straight into squad editing, and set **custom tactics**: mentality (Defensive / Balanced / Attacking / All-Out) and pressing (Low Block / Medium / High Press). Your choices measurably change how the match plays out.
 - ⚜️ **Hall of Legends** — icons like Cristiano Ronaldo, Messi, Zidane, Ronaldinho, Maldini, Ibrahimović, Henry and 17 more, pullable as ICON cards from Gold & Legend packs, collectible into your dream team, or faced as the **FINAL BOSS** club in a custom league.
 - 🕹️ **Top-down pixel match engine** — animated pitch, pixel players, goal confetti, live commentary, retro chiptune SFX, 1x/2x speed and skip.
@@ -31,10 +33,11 @@ npx serve .
 index.html        screens & layout
 css/style.css     pixel-art theme (CRT scanlines, hard shadows, rarity frames)
 js/data.js        teams, squads, gacha pool, rarities, the Legend
-js/collection.js  coins, packs, collection, formations, user club
-js/engine.js      match simulation + fixtures + league table
+js/collection.js  coins, packs, collection, formations, tactics, user club
+js/engine.js      live match sim + subs + penalty shootout + fixtures + table
 js/pitch.js       canvas renderers: crests, faces, top-down match scene
-js/ui.js          navigation, squad builder, store, season flow, database
+js/ui.js          navigation, squad builder, store, pre-match, season flow
+js/worldcup.js    16-nation single-elimination World Cup bracket
 ```
 
 All player ratings are original game values. Built with ❤️ for the Garuda.

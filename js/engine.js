@@ -1,6 +1,8 @@
 /* ============================================================
    NxrLegends — match engine
-   Generates a minute-by-minute event timeline from squad strength.
+   Live minute-by-minute simulation. Ratings are recomputed each
+   minute from the CURRENT on-pitch XI, so substitutions and
+   tactics changes actually change what happens next.
    ============================================================ */
 
 const CHANT_GOAL = [
@@ -24,36 +26,33 @@ const CHANT_LEGEND = [
   'GARUDA MAGIC! NXRSKYAA DOES IT AGAIN!'
 ];
 
-/* tactics multipliers from a team's chosen mentality + pressing (default = neutral) */
-function tacticsMods(team) {
-  const t = team && team.tactics;
+/* tactics multipliers from a chosen mentality + pressing (default = neutral) */
+function tacticsMods(tactics) {
+  const t = tactics;
   const m = (t && typeof MENTALITIES !== 'undefined' && MENTALITIES[t.mentality]) || { att: 0, def: 0 };
   const p = (t && typeof PRESSING !== 'undefined' && PRESSING[t.pressing]) || { press: 0 };
   return {
-    att: 1 + m.att + p.press * 0.5,       // pressing high creates more chances
+    att: 1 + m.att + p.press * 0.5,               // pressing high creates more chances
     def: 1 + m.def - Math.max(0, p.press) * 0.35, // ...but leaves gaps at the back
     tempo: 1 + Math.max(0, p.press) * 0.25        // high press = more end-to-end events
   };
 }
 
-function attackRating(team) {
-  const xi = bestXI(team.squadFull);
+/* attack / defense rating from an explicit XI array + tactics */
+function ratingsFromXI(xi, tactics) {
+  const mods = tacticsMods(tactics);
   const att = xi.filter(p => p.pos === 'FW' || p.pos === 'MF');
-  const base = att.reduce((s, p) => s + (p.pos === 'FW' ? p.ovr * 1.2 : p.ovr), 0) / att.length;
-  return base * tacticsMods(team).att;
-}
-function defenseRating(team) {
-  const xi = bestXI(team.squadFull);
+  const attBase = att.length ? att.reduce((s, p) => s + (p.pos === 'FW' ? p.ovr * 1.2 : p.ovr), 0) / att.length : 55;
   const def = xi.filter(p => p.pos === 'DF' || p.pos === 'GK' || p.pos === 'MF');
-  const base = def.reduce((s, p) => s + (p.pos === 'MF' ? p.ovr * 0.8 : p.ovr), 0) / def.length;
-  return base * tacticsMods(team).def;
+  const defBase = def.length ? def.reduce((s, p) => s + (p.pos === 'MF' ? p.ovr * 0.8 : p.ovr), 0) / def.length : 55;
+  return { att: attBase * mods.att, def: defBase * mods.def, tempo: mods.tempo };
 }
 
-function pickScorer(team) {
-  const xi = bestXI(team.squadFull);
+function pickScorerFromXI(xi) {
   const weights = xi.map(p => {
     let w = p.pos === 'FW' ? 6 : p.pos === 'MF' ? 3 : p.pos === 'DF' ? 1 : 0.1;
     if (p.legend) w *= 6;
+    if (p.icon) w *= 1.6;
     return w * (p.ovr / 70);
   });
   const total = weights.reduce((a, b) => a + b, 0);
@@ -62,47 +61,98 @@ function pickScorer(team) {
   return xi[xi.length - 1];
 }
 
-/* Simulate 90 minutes; returns { events, hg, ag } */
+function goalText(scorer) {
+  return scorer.legend ? pick(CHANT_LEGEND) : `${scorer.name} — ${pick(CHANT_GOAL)}`;
+}
+
+/* resolve a single minute given current ratings + XIs; returns event array */
+function resolveMinute(min, home, away, hXI, aXI) {
+  const hr = ratingsFromXI(hXI, home.tactics);
+  const ar = ratingsFromXI(aXI, away.tactics);
+  const tempo = (hr.tempo + ar.tempo) / 2;
+  const homeEdge = 1.12;
+  const pH = Math.max(0.008, (0.030 + (hr.att * homeEdge - ar.def) * 0.0022) * tempo);
+  const pA = Math.max(0.008, (0.030 + (ar.att - hr.def * 1.05) * 0.0022) * tempo);
+  const convH = 0.34 + Math.max(0, hr.att - ar.def) * 0.004;
+  const convA = 0.34 + Math.max(0, ar.att - hr.def) * 0.004;
+  const out = [];
+  if (Math.random() < pH) {
+    if (Math.random() < convH) {
+      const scorer = pickScorerFromXI(hXI);
+      out.push({ min, type: 'goal', side: 'home', player: scorer, text: goalText(scorer) });
+    } else out.push({ min, type: 'chance', side: 'home', text: `${home.short} attack... ${pick(CHANT_CHANCE)}` });
+  } else if (Math.random() < pA) {
+    if (Math.random() < convA) {
+      const scorer = pickScorerFromXI(aXI);
+      out.push({ min, type: 'goal', side: 'away', player: scorer, text: goalText(scorer) });
+    } else out.push({ min, type: 'chance', side: 'away', text: `${away.short} attack... ${pick(CHANT_CHANCE)}` });
+  } else if (Math.random() < 0.006) {
+    const side = Math.random() < 0.5 ? 'home' : 'away';
+    const xi = side === 'home' ? hXI : aXI;
+    out.push({ min, type: 'card', side, text: `Yellow card! ${pick(xi).name} goes into the book.` });
+  }
+  return out;
+}
+
+/* ---- live match: stepped one minute at a time, XIs are mutable ---- */
+class LiveMatch {
+  constructor(home, away, homeXI, awayXI) {
+    this.home = home; this.away = away;
+    this.homeXI = homeXI; this.awayXI = awayXI;
+    this.min = 0; this.hg = 0; this.ag = 0;
+  }
+  step() {
+    this.min++;
+    const evs = resolveMinute(this.min, this.home, this.away, this.homeXI, this.awayXI);
+    evs.forEach(e => { if (e.type === 'goal') { if (e.side === 'home') this.hg++; else this.ag++; } });
+    return evs;
+  }
+  done() { return this.min >= 90; }
+}
+
+/* ---- fast whole-match sim for AI vs AI (background fixtures) ---- */
 function simulateMatch(home, away) {
+  const hXI = bestXI(home.squadFull), aXI = bestXI(away.squadFull);
   const events = [];
-  const hAtt = attackRating(home), hDef = defenseRating(home);
-  const aAtt = attackRating(away), aDef = defenseRating(away);
-
-  // convert rating edge to per-minute chance probability
-  const homeEdge = 1.12; // home advantage
-  const tempo = (tacticsMods(home).tempo + tacticsMods(away).tempo) / 2;
-  const pH = Math.max(0.008, (0.030 + (hAtt * homeEdge - aDef) * 0.0022) * tempo);
-  const pA = Math.max(0.008, (0.030 + (aAtt - hDef * 1.05) * 0.0022) * tempo);
-  const convH = 0.34 + Math.max(0, hAtt - aDef) * 0.004;
-  const convA = 0.34 + Math.max(0, aAtt - hDef) * 0.004;
-
   let hg = 0, ag = 0;
   for (let min = 1; min <= 90; min++) {
-    if (Math.random() < pH) {
-      if (Math.random() < convH) {
-        const scorer = pickScorer(home);
-        hg++;
-        events.push({ min, type: 'goal', side: 'home', player: scorer,
-          text: scorer.legend ? pick(CHANT_LEGEND) : `${scorer.name} — ${pick(CHANT_GOAL)}` });
-      } else {
-        events.push({ min, type: 'chance', side: 'home', text: `${home.short} attack... ${pick(CHANT_CHANCE)}` });
-      }
-    } else if (Math.random() < pA) {
-      if (Math.random() < convA) {
-        const scorer = pickScorer(away);
-        ag++;
-        events.push({ min, type: 'goal', side: 'away', player: scorer,
-          text: scorer.legend ? pick(CHANT_LEGEND) : `${scorer.name} — ${pick(CHANT_GOAL)}` });
-      } else {
-        events.push({ min, type: 'chance', side: 'away', text: `${away.short} attack... ${pick(CHANT_CHANCE)}` });
-      }
-    } else if (Math.random() < 0.006) {
-      const side = Math.random() < 0.5 ? 'home' : 'away';
-      const t = side === 'home' ? home : away;
-      events.push({ min, type: 'card', side, text: `Yellow card! ${pick(bestXI(t.squadFull)).name} goes into the book.` });
-    }
+    const evs = resolveMinute(min, home, away, hXI, aXI);
+    evs.forEach(e => { if (e.type === 'goal') { if (e.side === 'home') hg++; else ag++; } });
+    events.push(...evs);
   }
   return { events, hg, ag };
+}
+
+/* ---- penalty shootout for knockout ties level after 90 ---- */
+function penaltyShootout(home, away) {
+  const takerSkill = t => {
+    const xi = bestXI(t.squadFull).filter(p => p.pos !== 'GK');
+    return xi.reduce((s, p) => s + (p.stats.SHO + p.stats.DRI) / 2, 0) / Math.max(1, xi.length);
+  };
+  const gkSkill = t => {
+    const gk = bestXI(t.squadFull).find(p => p.pos === 'GK');
+    return gk ? gk.stats.DEF : 70;
+  };
+  const hTake = takerSkill(home), aTake = takerSkill(away);
+  const hGk = gkSkill(home), aGk = gkSkill(away);
+  const log = [];
+  let h = 0, a = 0, round = 0;
+  const attempt = (takeSkill, gk) => {
+    const p = 0.5 + (takeSkill - gk) * 0.006; // ~0.5 base, skill-adjusted
+    return Math.random() < Math.max(0.35, Math.min(0.92, p));
+  };
+  // best of 5, then sudden death
+  while (true) {
+    round++;
+    const hScored = attempt(hTake, aGk); if (hScored) h++;
+    const aScored = attempt(aTake, hGk); if (aScored) a++;
+    log.push(`PK ${round}: ${home.short} ${hScored ? '⚽' : '✗'}  ${away.short} ${aScored ? '⚽' : '✗'}  (${h}-${a})`);
+    if (round >= 5) {
+      if (h !== a) break;
+    }
+    if (round >= 20) break; // safety
+  }
+  return { h, a, winner: h > a ? 'home' : 'away', log };
 }
 
 /* ---------------- league fixtures & table ---------------- */
@@ -119,7 +169,6 @@ function makeFixtures(teamIds, rounds) {
     for (let i = 0; i < half; i++) {
       const a = arr[i], b = arr[n - 1 - i];
       if (a !== null && b !== null) {
-        // alternate home/away by week for fairness
         md.push(w % 2 === 0 ? { home: a, away: b } : { home: b, away: a });
       }
     }
@@ -130,7 +179,6 @@ function makeFixtures(teamIds, rounds) {
     const second = fixtures.map(md => md.map(m => ({ home: m.away, away: m.home })));
     fixtures.push(...second);
   }
-  // flatten with matchday index
   const flat = [];
   fixtures.forEach((md, i) => md.forEach(m => flat.push({ ...m, md: i + 1, played: false, hg: 0, ag: 0 })));
   return flat;

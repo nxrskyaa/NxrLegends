@@ -392,6 +392,42 @@ canvas { image-rendering: pixelated; }
 .chooser-row canvas { width: 26px; height: 26px; }
 .chooser-row .cr-ovr { margin-left: auto; color: var(--gold); }
 
+/* ---------------- substitutions ---------------- */
+.chooser-box.wide { width: min(720px, 96vw); }
+.sub-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; overflow: hidden; }
+.sub-col { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; max-height: 56vh; }
+.sub-col-head { font-size: 9px; color: var(--gold); padding: 4px 2px 6px; position: sticky; top: 0; background: var(--panel); }
+.chooser-row.sub-selected { outline-color: var(--gold); background: #2a3560; }
+.chooser-row.sub-disabled { opacity: .4; }
+#btn-subs:disabled { opacity: .4; }
+
+/* ---------------- world cup ---------------- */
+.wc-setup .store-hint { margin-bottom: 16px; }
+.wc-tourney { display: flex; flex-direction: column; gap: 16px; }
+.wc-status { text-align: center; background: var(--panel); outline: var(--px) solid var(--shadow); padding: 16px; }
+.wc-status h3 { font-size: 13px; color: var(--gold); line-height: 1.6; }
+.wc-status p { font-size: 9px; color: var(--dim); margin-top: 8px; }
+.wc-trophy { font-size: 34px; display: block; margin-bottom: 8px; }
+.wc-actions { display: flex; justify-content: center; }
+.wc-bracket { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 10px; }
+.wc-round { flex: 0 0 auto; display: flex; flex-direction: column; gap: 10px; min-width: 190px; }
+.wc-round-name { font-size: 9px; color: var(--cyan); text-align: center; padding: 6px; background: var(--grass2); outline: 3px solid var(--shadow); }
+.wc-tie { background: var(--panel); outline: 3px solid var(--shadow); padding: 6px; position: relative; }
+.wc-tie-user { outline-color: var(--gold); }
+.wc-side { display: flex; align-items: center; gap: 6px; font-size: 8px; padding: 5px 4px; }
+.wc-side .wc-short { color: var(--cyan); flex: 0 0 34px; }
+.wc-side .wc-name { flex: 1; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wc-side .wc-score { color: var(--ink); }
+.wc-side.wc-win .wc-name { color: var(--gold); }
+.wc-side.wc-win .wc-score { color: var(--gold); }
+.wc-side.wc-lose { opacity: .55; }
+.wc-pens { font-size: 7px; color: var(--cyan); text-align: right; padding: 0 4px 2px; }
+
+@media (max-width: 640px) {
+  .sub-cols { grid-template-columns: 1fr; }
+  .sub-col { max-height: 32vh; }
+}
+
 /* ---------------- pre-match: squad + tactics ---------------- */
 .pm-versus {
   display: flex; align-items: center; justify-content: center; gap: 20px; flex-wrap: wrap;

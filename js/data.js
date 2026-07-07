@@ -118,6 +118,13 @@ const STARS = {
   thailand:   [{ name: 'CHANATHIP SONGKRASIN', pos: 'MF', ovr: 75 }, { name: 'SUPACHOK SARACHAT', pos: 'MF', ovr: 73 }],
   malaysia:   [{ name: 'ARIF AIMAN', pos: 'FW', ovr: 73 }, { name: 'FAISAL HALIM', pos: 'FW', ovr: 71 }],
 
+  brazil:     [{ name: 'VINICIUS JR', pos: 'FW', ovr: 90 }, { name: 'RODRYGO', pos: 'FW', ovr: 85 }, { name: 'CASEMIRO', pos: 'MF', ovr: 84 }, { name: 'MARQUINHOS', pos: 'DF', ovr: 86 }, { name: 'ALISSON', pos: 'GK', ovr: 87 }],
+  argentina:  [{ name: 'LAUTARO MARTINEZ', pos: 'FW', ovr: 87 }, { name: 'JULIAN ALVAREZ', pos: 'FW', ovr: 85 }, { name: 'ENZO FERNANDEZ', pos: 'MF', ovr: 84 }, { name: 'CRISTIAN ROMERO', pos: 'DF', ovr: 85 }, { name: 'EMILIANO MARTINEZ', pos: 'GK', ovr: 86 }],
+  france:     [{ name: 'KYLIAN MBAPPE', pos: 'FW', ovr: 91 }, { name: 'ANTOINE GRIEZMANN', pos: 'FW', ovr: 86 }, { name: 'AURELIEN TCHOUAMENI', pos: 'MF', ovr: 84 }, { name: 'WILLIAM SALIBA', pos: 'DF', ovr: 86 }, { name: 'MIKE MAIGNAN', pos: 'GK', ovr: 85 }],
+  england:    [{ name: 'JUDE BELLINGHAM', pos: 'MF', ovr: 89 }, { name: 'HARRY KANE', pos: 'FW', ovr: 90 }, { name: 'PHIL FODEN', pos: 'MF', ovr: 86 }, { name: 'BUKAYO SAKA', pos: 'FW', ovr: 87 }, { name: 'JORDAN PICKFORD', pos: 'GK', ovr: 83 }],
+  spain:      [{ name: 'RODRI', pos: 'MF', ovr: 89 }, { name: 'PEDRI', pos: 'MF', ovr: 86 }, { name: 'LAMINE YAMAL', pos: 'FW', ovr: 85 }, { name: 'GAVI', pos: 'MF', ovr: 82 }, { name: 'UNAI SIMON', pos: 'GK', ovr: 83 }],
+  germany:    [{ name: 'JAMAL MUSIALA', pos: 'MF', ovr: 87 }, { name: 'FLORIAN WIRTZ', pos: 'MF', ovr: 86 }, { name: 'KAI HAVERTZ', pos: 'FW', ovr: 84 }, { name: 'JOSHUA KIMMICH', pos: 'MF', ovr: 85 }, { name: 'ANTONIO RUDIGER', pos: 'DF', ovr: 85 }],
+
   arsenal:    [{ name: 'BUKAYO SAKA', pos: 'FW', ovr: 87 }, { name: 'MARTIN ODEGAARD', pos: 'MF', ovr: 87 }, { name: 'DECLAN RICE', pos: 'MF', ovr: 86 }, { name: 'WILLIAM SALIBA', pos: 'DF', ovr: 87 }, { name: 'DAVID RAYA', pos: 'GK', ovr: 84 }],
   villa:      [{ name: 'OLLIE WATKINS', pos: 'FW', ovr: 84 }, { name: 'EMILIANO MARTINEZ', pos: 'GK', ovr: 84 }, { name: 'MORGAN ROGERS', pos: 'MF', ovr: 80 }],
   bournemouth:[{ name: 'ANTOINE SEMENYO', pos: 'FW', ovr: 80 }, { name: 'JUSTIN KLUIVERT', pos: 'MF', ovr: 78 }],
@@ -181,6 +188,12 @@ const TEAMS = [
   { id: 'vnm', name: 'VIETNAM',        short: 'VNM', type: 'nation', colors: ['#d40000', '#ffd23f'], base: 72, pool: 'vn', stars: 'vietnam',    desc: 'GOLDEN STAR WARRIORS' },
   { id: 'tha', name: 'THAILAND',       short: 'THA', type: 'nation', colors: ['#12295e', '#d40000'], base: 72, pool: 'th', stars: 'thailand',   desc: 'THE WAR ELEPHANTS' },
   { id: 'mys', name: 'MALAYSIA',       short: 'MYS', type: 'nation', colors: ['#ffd23f', '#0b1020'], base: 70, pool: 'my', stars: 'malaysia',   desc: 'HARIMAU MALAYA' },
+  { id: 'bra', name: 'BRAZIL',         short: 'BRA', type: 'nation', colors: ['#ffd23f', '#0a7a3c'], base: 86, pool: 'en', stars: 'brazil',     desc: 'A SELEÇÃO — 5-TIME KINGS' },
+  { id: 'arg', name: 'ARGENTINA',      short: 'ARG', type: 'nation', colors: ['#8fd0ff', '#ffffff'], base: 86, pool: 'en', stars: 'argentina',  desc: 'LA ALBICELESTE — WORLD CHAMPIONS' },
+  { id: 'fra', name: 'FRANCE',         short: 'FRA', type: 'nation', colors: ['#1b3fa0', '#ffffff'], base: 87, pool: 'en', stars: 'france',     desc: 'LES BLEUS' },
+  { id: 'eng', name: 'ENGLAND',        short: 'ENG', type: 'nation', colors: ['#f5f5f5', '#d40000'], base: 85, pool: 'en', stars: 'england',    desc: 'THE THREE LIONS' },
+  { id: 'esp', name: 'SPAIN',          short: 'ESP', type: 'nation', colors: ['#d40000', '#ffd23f'], base: 85, pool: 'en', stars: 'spain',      desc: 'LA ROJA' },
+  { id: 'ger', name: 'GERMANY',        short: 'GER', type: 'nation', colors: ['#0b1020', '#ffd23f'], base: 85, pool: 'en', stars: 'germany',    desc: 'DIE MANNSCHAFT' },
 
   /* --- Liga 1 clubs --- */
   { id: 'psj', name: 'PERSIJA JAKARTA', short: 'PSJ', type: 'club', colors: ['#e63946', '#ff8c00'], base: 74, pool: 'id', desc: 'MACAN KEMAYORAN' },

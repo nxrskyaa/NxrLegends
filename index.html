@@ -25,6 +25,7 @@
       <p class="tagline">PIXEL FOOTBALL &#9679; GACHA SQUADS &#9679; 38-0 GLORY</p>
       <div class="title-menu">
         <button class="px-btn big gold" data-nav="hubentry">&#9658; SEASON — 38-0 CHALLENGE</button>
+        <button class="px-btn big" data-nav="worldcup">&#9819; WORLD CUP</button>
         <button class="px-btn big" data-nav="squad">&#9873; MY SQUAD</button>
         <button class="px-btn big" data-nav="store">&#9830; GACHA STORE</button>
         <button class="px-btn big" data-nav="customleague">&#9733; CUSTOM LEAGUE</button>
@@ -161,9 +162,20 @@
       <canvas id="pitch" width="480" height="300"></canvas>
       <div class="match-controls">
         <button class="px-btn small" id="btn-speed">SPEED x1</button>
+        <button class="px-btn small" id="btn-subs">SUBS (3)</button>
         <button class="px-btn small gold" id="btn-skip">SKIP &#9658;&#9658;</button>
       </div>
       <div id="commentary" class="commentary"></div>
+    </div>
+    <div id="sub-panel" class="chooser hidden">
+      <div class="chooser-box wide">
+        <h3 id="sub-title" class="panel-title">SUBSTITUTIONS</h3>
+        <div class="sub-cols">
+          <div id="sub-onpitch" class="sub-col"></div>
+          <div id="sub-bench" class="sub-col"></div>
+        </div>
+        <div class="seg"><button class="px-btn small" id="sub-close">DONE</button></div>
+      </div>
     </div>
   </section>
 
@@ -176,6 +188,24 @@
       <div id="result-coins" class="result-coins"></div>
       <div id="result-streak" class="result-streak"></div>
       <button class="px-btn big gold" id="btn-continue">CONTINUE &#9658;</button>
+    </div>
+  </section>
+
+  <!-- ============ WORLD CUP ============ -->
+  <section id="screen-worldcup" class="screen">
+    <header class="topbar">
+      <button class="px-btn small" data-nav="title">&#9668; BACK</button>
+      <h2>WORLD CUP</h2>
+      <span class="topbar-hint">16 NATIONS &#9679; SINGLE-ELIMINATION &#9679; PENALTIES DECIDE</span>
+    </header>
+    <div id="wc-setup" class="wc-setup">
+      <p class="store-hint">PICK YOUR NATION AND FIGHT THROUGH ROUND OF 16 &#8594; QUARTERS &#8594; SEMIS &#8594; THE FINAL. LEVEL AFTER 90? STRAIGHT TO A PENALTY SHOOTOUT.</p>
+      <div id="wc-nations" class="team-grid compact"></div>
+    </div>
+    <div id="wc-tourney" class="wc-tourney hidden">
+      <div id="wc-status" class="wc-status"></div>
+      <div id="wc-actions" class="wc-actions"></div>
+      <div id="wc-bracket" class="wc-bracket"></div>
     </div>
   </section>
 
@@ -245,5 +275,6 @@
 <script src="js/engine.js"></script>
 <script src="js/pitch.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/worldcup.js"></script>
 </body>
 </html>
