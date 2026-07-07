@@ -24,7 +24,17 @@ const PACKS = {
   legend: { name: 'LEGEND PACK', cost: 8000, cards: 5, min: 82, max: 90, legendChance: 0.05,  iconChance: 0.22, desc: '5 PLAYERS · OVR 82+ · 22% ICON · 5% NXR',  color: '#ff9df5' }
 };
 
-/* custom tactics */
+/* free draft pack (granted by difficulty at season start): pulls across ALL rarities */
+const DRAFT_PACK = { cards: 3, min: 58, max: 99, legendChance: 0.012, iconChance: 0.04 };
+
+/* season difficulty: free gacha + rival strength scaling */
+const DIFFICULTY = {
+  easy:   { name: 'EASY',   packs: 4, oppScale: 0.90, reward: 1.3, desc: '4 FREE DRAFT PACKS · WEAKER RIVALS · +30% COINS' },
+  medium: { name: 'MEDIUM', packs: 2, oppScale: 1.00, reward: 1.0, desc: '2 FREE DRAFT PACKS · A FAIR FIGHT' },
+  hard:   { name: 'HARD',   packs: 1, oppScale: 1.07, reward: 0.8, desc: '1 FREE DRAFT PACK · ELITE RIVALS · THE TRUE 38-0' }
+};
+
+/* custom tactics — five dimensions, all feed the match engine */
 const MENTALITIES = {
   defensive: { name: 'DEFENSIVE',   att: -0.12, def: 0.16,  desc: 'SIT DEEP, SOAK PRESSURE, HIT ON THE BREAK' },
   balanced:  { name: 'BALANCED',    att: 0,     def: 0,     desc: 'SOLID SHAPE, CONTROL BOTH BOXES' },
@@ -36,7 +46,29 @@ const PRESSING = {
   medium: { name: 'MEDIUM',     press: 0,     desc: 'BALANCED PRESS, PICK YOUR MOMENTS' },
   high:   { name: 'HIGH PRESS', press: 0.15,  desc: 'WIN IT HIGH — MORE CHANCES, MORE RISK' }
 };
-function defaultTactics() { return { mentality: 'balanced', pressing: 'medium' }; }
+const WIDTH = {
+  narrow:   { name: 'NARROW',   att: 0.04, def: 0.03,  desc: 'CONGEST THE MIDDLE, QUICK COMBINATIONS' },
+  balanced: { name: 'BALANCED', att: 0,    def: 0,     desc: 'USE THE WHOLE PITCH' },
+  wide:     { name: 'WIDE',     att: 0.07, def: -0.04, desc: 'STRETCH THEM, WHIP CROSSES IN' }
+};
+const TEMPO = {
+  slow:     { name: 'SLOW',     att: -0.05, def: 0.06,  tempo: -0.12, desc: 'KEEP THE BALL, CONTROL THE GAME' },
+  balanced: { name: 'BALANCED', att: 0,     def: 0,     tempo: 0,     desc: 'MIX IT UP' },
+  fast:     { name: 'FAST',     att: 0.09,  def: -0.05, tempo: 0.16,  desc: 'END TO END, RELENTLESS TRANSITIONS' }
+};
+const DLINE = {
+  deep:   { name: 'DEEP LINE',   att: -0.03, def: 0.11,  desc: 'DROP OFF, DENY THE SPACE IN BEHIND' },
+  medium: { name: 'MEDIUM LINE', att: 0,     def: 0,     desc: 'HOLD A STANDARD LINE' },
+  high:   { name: 'HIGH LINE',   att: 0.08,  def: -0.11, desc: 'SQUEEZE UP — RISK THE BALL OVER THE TOP' }
+};
+const TACTIC_DIMS = [
+  { key: 'mentality', label: 'MENTALITY',      dict: MENTALITIES },
+  { key: 'pressing',  label: 'PRESSING',       dict: PRESSING },
+  { key: 'tempo',     label: 'TEMPO',          dict: TEMPO },
+  { key: 'width',     label: 'WIDTH',          dict: WIDTH },
+  { key: 'line',      label: 'DEFENSIVE LINE', dict: DLINE }
+];
+function defaultTactics() { return { mentality: 'balanced', pressing: 'medium', width: 'balanced', tempo: 'balanced', line: 'medium' }; }
 
 const ACADEMY_KID = { name: 'ACADEMY KID', pos: 'ANY', ovr: 45, stats: { PAC: 45, SHO: 45, PAS: 45, DRI: 45, DEF: 45, PHY: 45 }, pid: 'kid' };
 
@@ -49,7 +81,7 @@ function defaultCollection() {
 function loadCollection() {
   try {
     const raw = localStorage.getItem(COLL_KEY);
-    if (raw) { COLL = JSON.parse(raw); if (!COLL.tactics) COLL.tactics = defaultTactics(); return; }
+    if (raw) { COLL = JSON.parse(raw); COLL.tactics = { ...defaultTactics(), ...(COLL.tactics || {}) }; return; }
   } catch (e) {}
   COLL = defaultCollection();
   grantStarterSquad();
@@ -101,6 +133,28 @@ function openPack(key) {
     else COLL.owned.push(player.pid);
     pulls.push({ player, dupe, refund });
   }
+  saveCollection();
+  return pulls;
+}
+
+/* free draft: N packs pulling across ALL rarities, returned sorted lowest -> highest */
+function openFreeDraft(n) {
+  const pulls = [];
+  for (let k = 0; k < n; k++) {
+    for (let i = 0; i < DRAFT_PACK.cards; i++) {
+      let player;
+      const roll = Math.random();
+      if (roll < DRAFT_PACK.legendChance) player = PLAYER_INDEX['idn:0'].player;
+      else if (roll < DRAFT_PACK.legendChance + DRAFT_PACK.iconChance) player = pick(ICON_POOL);
+      else player = pick(GACHA_POOL.filter(p => p.ovr >= DRAFT_PACK.min && p.ovr <= DRAFT_PACK.max));
+      const dupe = COLL.owned.includes(player.pid);
+      let refund = 0;
+      if (dupe) { refund = sellValue(player); COLL.coins += refund; }
+      else COLL.owned.push(player.pid);
+      pulls.push({ player, dupe, refund });
+    }
+  }
+  pulls.sort((a, b) => a.player.ovr - b.player.ovr); // lowest rarity -> highest
   saveCollection();
   return pulls;
 }
@@ -194,8 +248,9 @@ function setTactic(kind, value) {
 }
 
 /* match rewards */
-function matchReward(won, drew, goals) {
-  const c = won ? 400 + goals * 40 : drew ? 150 : 60;
+function matchReward(won, drew, goals, mult) {
+  const base = won ? 400 + goals * 40 : drew ? 150 : 60;
+  const c = Math.round(base * (mult || 1));
   COLL.coins += c;
   saveCollection();
   return c;

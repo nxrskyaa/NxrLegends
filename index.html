@@ -87,11 +87,17 @@
     </header>
     <p class="store-hint">EARN COINS BY PLAYING MATCHES &#9679; DUPLICATES AUTO-CONVERT TO COINS &#9679; NXRSKYAA HIDES IN GOLD &amp; LEGEND PACKS</p>
     <div id="pack-grid" class="pack-grid"></div>
-    <div id="pack-reveal" class="pack-reveal hidden">
-      <h3 id="reveal-title" class="panel-title">PACK OPENED!</h3>
-      <div id="reveal-cards" class="reveal-cards"></div>
-      <button class="px-btn big gold" id="reveal-done">COLLECT &#9658;</button>
-    </div>
+  </section>
+
+  <!-- ============ DIFFICULTY PICKER ============ -->
+  <section id="screen-difficulty" class="screen">
+    <header class="topbar">
+      <button class="px-btn small" data-nav="title">&#9668; BACK</button>
+      <h2>THE 38-0 CHALLENGE</h2>
+      <span class="topbar-hint">PICK YOUR DIFFICULTY</span>
+    </header>
+    <p class="store-hint">BEAT ALL 38 MATCHES AGAINST THE ENGLISH LEAGUE. HARDER MODES = FEWER FREE PACKS &amp; TOUGHER RIVALS — BUT MORE GLORY. FREE DRAFT PACKS PULL PLAYERS OF EVERY RARITY, LOWEST TO HIGHEST.</p>
+    <div id="diff-grid" class="diff-grid"></div>
   </section>
 
   <!-- ============ SEASON HUB ============ -->
@@ -132,16 +138,7 @@
       </div>
       <div class="pm-tactics">
         <h3 class="panel-title">CUSTOM TACTICS</h3>
-        <div class="tac-block">
-          <span class="px-label">MENTALITY</span>
-          <div class="seg vert" id="pm-mentality"></div>
-          <p class="tac-desc" id="pm-mentality-desc"></p>
-        </div>
-        <div class="tac-block">
-          <span class="px-label">PRESSING</span>
-          <div class="seg vert" id="pm-pressing"></div>
-          <p class="tac-desc" id="pm-pressing-desc"></p>
-        </div>
+        <div id="pm-tactics-list" class="tac-grid"></div>
       </div>
     </div>
     <div class="pm-actions">
@@ -167,6 +164,7 @@
       </div>
       <div id="commentary" class="commentary"></div>
     </div>
+    <div id="goal-banner" class="goal-banner hidden"><span id="goal-banner-txt"></span></div>
     <div id="sub-panel" class="chooser hidden">
       <div class="chooser-box wide">
         <h3 id="sub-title" class="panel-title">SUBSTITUTIONS</h3>
@@ -195,11 +193,11 @@
   <section id="screen-worldcup" class="screen">
     <header class="topbar">
       <button class="px-btn small" data-nav="title">&#9668; BACK</button>
-      <h2>WORLD CUP</h2>
-      <span class="topbar-hint">16 NATIONS &#9679; SINGLE-ELIMINATION &#9679; PENALTIES DECIDE</span>
+      <h2>WORLD CUP 2026</h2>
+      <span class="topbar-hint">48 NATIONS &#9679; 12 GROUPS &#9679; KNOCKOUT &#9679; PENALTIES DECIDE</span>
     </header>
     <div id="wc-setup" class="wc-setup">
-      <p class="store-hint">PICK YOUR NATION AND FIGHT THROUGH ROUND OF 16 &#8594; QUARTERS &#8594; SEMIS &#8594; THE FINAL. LEVEL AFTER 90? STRAIGHT TO A PENALTY SHOOTOUT.</p>
+      <p class="store-hint">PICK YOUR NATION FROM THE REAL 48-TEAM WORLD CUP 2026 FIELD. TOP THE GROUP, THEN FIGHT THROUGH ROUND OF 32 &#8594; 16 &#8594; QUARTERS &#8594; SEMIS &#8594; THE FINAL. LEVEL AFTER 90? STRAIGHT TO A PENALTY SHOOTOUT.</p>
       <div id="wc-nations" class="team-grid compact"></div>
     </div>
     <div id="wc-tourney" class="wc-tourney hidden">
@@ -258,6 +256,13 @@
       <div id="db-squad" class="db-squad"></div>
     </div>
   </section>
+
+  <!-- ============ GLOBAL OVERLAY: PACK REVEAL ============ -->
+  <div id="pack-reveal" class="pack-reveal hidden">
+    <h3 id="reveal-title" class="panel-title">PACK OPENED!</h3>
+    <div id="reveal-cards" class="reveal-cards"></div>
+    <button class="px-btn big gold" id="reveal-done">COLLECT &#9658;</button>
+  </div>
 
   <!-- ============ LEGEND (NXRSKYAA) ============ -->
   <section id="screen-legend" class="screen">

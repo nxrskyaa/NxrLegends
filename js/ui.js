@@ -78,12 +78,34 @@ function nextUserMatch() { return userMatches().find(f => !f.played); }
 /* SEASON button: resume an unfinished season, else start the 38-0 challenge
    (your club + all 19 English league clubs, home & away = 38 matches) */
 function enterSeason() {
-  if (!SEASON || !nextUserMatch()) {
-    if (SEASON && !nextUserMatch()) clearSeason();
-    newSeason(USER_TEAM_ID, [USER_TEAM_ID, ...EPL_IDS], 2, 'THE 38-0 CHALLENGE');
-  }
-  renderHub();
-  show('hub');
+  if (SEASON && nextUserMatch()) { renderHub(); show('hub'); return; } // resume unfinished season
+  if (SEASON && !nextUserMatch()) clearSeason();
+  renderDifficulty();
+  show('difficulty');
+}
+
+function renderDifficulty() {
+  const grid = $('#diff-grid');
+  grid.innerHTML = '';
+  Object.entries(DIFFICULTY).forEach(([key, d]) => {
+    const card = document.createElement('button');
+    card.className = 'diff-card diff-' + key;
+    card.innerHTML =
+      `<div class="diff-name">${d.name}</div><div class="diff-desc">${d.desc}</div><div class="diff-go">START ►</div>`;
+    card.addEventListener('click', () => startChallenge(key));
+    grid.appendChild(card);
+  });
+}
+
+function startChallenge(diffKey) {
+  SFX.whistle();
+  newSeason(USER_TEAM_ID, [USER_TEAM_ID, ...EPL_IDS], 2, 'THE 38-0 CHALLENGE');
+  SEASON.difficulty = diffKey;
+  saveSeason();
+  const d = DIFFICULTY[diffKey];
+  const pulls = openFreeDraft(d.packs);
+  SFX.coin();
+  showReveal(`${d.name} MODE — ${d.packs} FREE DRAFT PACK${d.packs > 1 ? 'S' : ''}!`, pulls, () => { renderHub(); show('hub'); });
 }
 
 /* ---------------- shared cards ---------------- */
@@ -290,17 +312,21 @@ function renderStore() {
       setTimeout(() => {
         card.classList.remove('shake');
         const pulls = openPack(key);
-        if (pulls) showReveal(pack, pulls);
+        if (pulls) showReveal(pack.name + ' OPENED!', pulls, () => renderStore());
       }, 550);
     });
     grid.appendChild(card);
   });
 }
 
-function showReveal(pack, pulls) {
-  $('#reveal-title').textContent = pack.name + ' OPENED!';
+let REVEAL_DONE = null;
+
+function showReveal(title, pulls, onDone) {
+  REVEAL_DONE = onDone;
+  $('#reveal-title').textContent = title;
   const box = $('#reveal-cards');
   box.innerHTML = '';
+  const step = pulls.length > 6 ? 240 : 420;
   pulls.forEach((pull, i) => {
     const p = pull.player;
     const r = rarityOf(p);
@@ -312,20 +338,20 @@ function showReveal(pack, pulls) {
     card.insertAdjacentHTML('beforeend', `
       <div class="rv-name">${p.name}</div>
       <div class="rv-ovr">${p.ovr}</div>
-      <div class="rv-pos">${p.pos} · ${r.toUpperCase()}${p.legend ? ' ★' : ''}</div>
+      <div class="rv-pos">${p.pos} · ${r.toUpperCase()}${p.legend ? ' ★' : p.icon ? ' ⚜' : ''}</div>
       <div class="rv-tag ${pull.dupe ? '' : 'rv-new'}">${pull.dupe ? 'DUPLICATE +' + pull.refund + ' ◉' : 'NEW!'}</div>`);
     box.appendChild(card);
     setTimeout(() => {
       card.classList.add('flip');
-      if (p.legend) SFX.legend(); else SFX.reveal(i);
-    }, 350 + i * 420);
+      if (p.legend || p.icon) SFX.legend(); else SFX.reveal(Math.min(i, 6));
+    }, 300 + i * step);
   });
   $('#pack-reveal').classList.remove('hidden');
 }
 $('#reveal-done').addEventListener('click', () => {
   SFX.nav();
   $('#pack-reveal').classList.add('hidden');
-  renderStore();
+  if (REVEAL_DONE) REVEAL_DONE();
 });
 
 /* ============================================================
@@ -426,6 +452,7 @@ function playSeasonFixture(fx) {
     userTeamId: SEASON.user,
     label: `MATCHDAY ${fx.md} — ${SEASON.leagueName}`,
     knockout: false,
+    oppScale: (DIFFICULTY[SEASON.difficulty] || DIFFICULTY.medium).oppScale,
     onComplete: res => seasonComplete(fx, res),
     onBack: () => { renderHub(); show('hub'); }
   });
@@ -506,35 +533,29 @@ function showPrematch() {
 /* tactics live in COLL.tactics (persistent), attached to the controlled side at kickoff */
 function renderTacticsControls() {
   const tac = COLL.tactics;
-  const mSeg = $('#pm-mentality');
-  mSeg.innerHTML = '';
-  Object.entries(MENTALITIES).forEach(([key, m]) => {
-    const b = document.createElement('button');
-    b.className = 'px-tab' + (tac.mentality === key ? ' active' : '');
-    b.textContent = m.name;
-    b.addEventListener('click', () => {
-      SFX.click();
-      COLL.tactics.mentality = key; saveCollection();
-      renderTacticsControls();
+  const list = $('#pm-tactics-list');
+  list.innerHTML = '';
+  TACTIC_DIMS.forEach(dim => {
+    const block = document.createElement('div');
+    block.className = 'tac-block';
+    block.insertAdjacentHTML('beforeend', `<span class="px-label">${dim.label}</span>`);
+    const seg = document.createElement('div');
+    seg.className = 'seg vert';
+    Object.entries(dim.dict).forEach(([key, opt]) => {
+      const b = document.createElement('button');
+      b.className = 'px-tab' + (tac[dim.key] === key ? ' active' : '');
+      b.textContent = opt.name;
+      b.addEventListener('click', () => {
+        SFX.click();
+        COLL.tactics[dim.key] = key; saveCollection();
+        renderTacticsControls();
+      });
+      seg.appendChild(b);
     });
-    mSeg.appendChild(b);
+    block.appendChild(seg);
+    block.insertAdjacentHTML('beforeend', `<p class="tac-desc">${dim.dict[tac[dim.key]].desc}</p>`);
+    list.appendChild(block);
   });
-  $('#pm-mentality-desc').textContent = MENTALITIES[tac.mentality].desc;
-
-  const pSeg = $('#pm-pressing');
-  pSeg.innerHTML = '';
-  Object.entries(PRESSING).forEach(([key, p]) => {
-    const b = document.createElement('button');
-    b.className = 'px-tab' + (tac.pressing === key ? ' active' : '');
-    b.textContent = p.name;
-    b.addEventListener('click', () => {
-      SFX.click();
-      COLL.tactics.pressing = key; saveCollection();
-      renderTacticsControls();
-    });
-    pSeg.appendChild(b);
-  });
-  $('#pm-pressing-desc').textContent = PRESSING[tac.pressing].desc;
 }
 
 $('#pm-back').addEventListener('click', () => { SFX.nav(); (PENDING_CTX.onBack || (() => show('title')))(); });
@@ -611,8 +632,10 @@ function startMatch() {
   const ctx = PENDING_CTX;
   const home = getTeam(ctx.homeId), away = getTeam(ctx.awayId);
   // attach the manager's custom tactics to whichever side they control
-  if (ctx.userTeamId === ctx.homeId) home.tactics = { ...COLL.tactics };
-  else if (ctx.userTeamId === ctx.awayId) away.tactics = { ...COLL.tactics };
+  home.tactics = null; away.tactics = null;
+  home.strMod = 1; away.strMod = 1;
+  if (ctx.userTeamId === ctx.homeId) { home.tactics = { ...COLL.tactics }; if (ctx.oppScale) away.strMod = ctx.oppScale; }
+  else if (ctx.userTeamId === ctx.awayId) { away.tactics = { ...COLL.tactics }; if (ctx.oppScale) home.strMod = ctx.oppScale; }
 
   const homeXI = startingEleven(home), awayXI = startingEleven(away);
   const live = new LiveMatch(home, away, homeXI, awayXI);
@@ -684,8 +707,9 @@ function applyEvent(ev, live) {
     $('#sb-score-h').textContent = M.live.hg;
     $('#sb-score-a').textContent = M.live.ag;
     if (live) {
-      M.scene.goal(ev.side);
-      if (ev.player && ev.player.legend) SFX.legend(); else SFX.goal();
+      M.scene.goal(ev.side, ev.player);
+      showGoalBanner(ev.player, ev.side);
+      if (ev.player && (ev.player.legend || ev.player.icon)) SFX.legend(); else SFX.goal();
     }
     logLine(`${ev.min}' ${ev.text}`, ev.player && (ev.player.legend || ev.player.icon) ? 'legend' : 'goal');
   } else if (ev.type === 'chance') {
@@ -703,6 +727,20 @@ function logLine(text, cls) {
   p.textContent = text;
   box.appendChild(p);
   box.scrollTop = box.scrollHeight;
+}
+
+let GOAL_BANNER_T = null;
+function showGoalBanner(player, side) {
+  const el = $('#goal-banner'), txt = $('#goal-banner-txt');
+  const special = player && (player.legend || player.icon);
+  el.className = 'goal-banner' + (special ? ' goal-banner-special' : '');
+  txt.innerHTML = `<span class="gb-big">GOAL${special ? '!!!' : '!'}</span>` +
+    (player ? `<span class="gb-name">${player.name}${player.legend ? ' ★' : player.icon ? ' ⚜' : ''}</span>` : '');
+  // retrigger the slam animation
+  el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+  clearTimeout(GOAL_BANNER_T);
+  GOAL_BANNER_T = setTimeout(() => { el.classList.remove('show'); el.classList.add('hidden'); }, 2100);
+  el.classList.remove('hidden');
 }
 
 $('#btn-speed').addEventListener('click', () => {
@@ -857,7 +895,8 @@ function seasonComplete(fx, res) {
   const isUserHome = fx.home === SEASON.user;
   const ug = isUserHome ? res.hg : res.ag, og = isUserHome ? res.ag : res.hg;
   const won = ug > og, drew = ug === og;
-  const earned = matchReward(won, drew, ug);
+  const diff = DIFFICULTY[SEASON.difficulty] || DIFFICULTY.medium;
+  const earned = matchReward(won, drew, ug, diff.reward);
   SFX.coin();
 
   const um = userMatches(), r = userRecord();

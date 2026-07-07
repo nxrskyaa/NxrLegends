@@ -26,16 +26,22 @@ const CHANT_LEGEND = [
   'GARUDA MAGIC! NXRSKYAA DOES IT AGAIN!'
 ];
 
-/* tactics multipliers from a chosen mentality + pressing (default = neutral) */
+/* tactics multipliers aggregated across all five dimensions (default = neutral) */
 function tacticsMods(tactics) {
-  const t = tactics;
-  const m = (t && typeof MENTALITIES !== 'undefined' && MENTALITIES[t.mentality]) || { att: 0, def: 0 };
-  const p = (t && typeof PRESSING !== 'undefined' && PRESSING[t.pressing]) || { press: 0 };
-  return {
-    att: 1 + m.att + p.press * 0.5,               // pressing high creates more chances
-    def: 1 + m.def - Math.max(0, p.press) * 0.35, // ...but leaves gaps at the back
-    tempo: 1 + Math.max(0, p.press) * 0.25        // high press = more end-to-end events
-  };
+  const t = tactics || {};
+  let att = 1, def = 1, tempo = 1;
+  const m = (typeof MENTALITIES !== 'undefined' && MENTALITIES[t.mentality]);
+  if (m) { att += m.att; def += m.def; }
+  const p = (typeof PRESSING !== 'undefined' && PRESSING[t.pressing]);
+  if (p) { att += p.press * 0.5; def -= Math.max(0, p.press) * 0.35; tempo += Math.max(0, p.press) * 0.25; }
+  [['WIDTH', t.width], ['TEMPO', t.tempo], ['DLINE', t.line]].forEach(([name, key]) => {
+    const dict = (name === 'WIDTH' ? (typeof WIDTH !== 'undefined' && WIDTH) :
+                  name === 'TEMPO' ? (typeof TEMPO !== 'undefined' && TEMPO) :
+                  (typeof DLINE !== 'undefined' && DLINE));
+    const o = dict && dict[key];
+    if (o) { att += o.att || 0; def += o.def || 0; tempo += o.tempo || 0; }
+  });
+  return { att: Math.max(0.4, att), def: Math.max(0.4, def), tempo: Math.max(0.5, tempo) };
 }
 
 /* attack / defense rating from an explicit XI array + tactics */
@@ -69,6 +75,8 @@ function goalText(scorer) {
 function resolveMinute(min, home, away, hXI, aXI) {
   const hr = ratingsFromXI(hXI, home.tactics);
   const ar = ratingsFromXI(aXI, away.tactics);
+  const hMod = home.strMod || 1, aMod = away.strMod || 1; // difficulty scaling
+  hr.att *= hMod; hr.def *= hMod; ar.att *= aMod; ar.def *= aMod;
   const tempo = (hr.tempo + ar.tempo) / 2;
   const homeEdge = 1.12;
   const pH = Math.max(0.008, (0.030 + (hr.att * homeEdge - ar.def) * 0.0022) * tempo);

@@ -125,6 +125,27 @@ const STARS = {
   spain:      [{ name: 'RODRI', pos: 'MF', ovr: 89 }, { name: 'PEDRI', pos: 'MF', ovr: 86 }, { name: 'LAMINE YAMAL', pos: 'FW', ovr: 85 }, { name: 'GAVI', pos: 'MF', ovr: 82 }, { name: 'UNAI SIMON', pos: 'GK', ovr: 83 }],
   germany:    [{ name: 'JAMAL MUSIALA', pos: 'MF', ovr: 87 }, { name: 'FLORIAN WIRTZ', pos: 'MF', ovr: 86 }, { name: 'KAI HAVERTZ', pos: 'FW', ovr: 84 }, { name: 'JOSHUA KIMMICH', pos: 'MF', ovr: 85 }, { name: 'ANTONIO RUDIGER', pos: 'DF', ovr: 85 }],
 
+  portugal:   [{ name: 'BRUNO FERNANDES', pos: 'MF', ovr: 86 }, { name: 'BERNARDO SILVA', pos: 'MF', ovr: 86 }, { name: 'RAFAEL LEAO', pos: 'FW', ovr: 85 }, { name: 'RUBEN DIAS', pos: 'DF', ovr: 86 }, { name: 'DIOGO COSTA', pos: 'GK', ovr: 84 }],
+  netherlands:[{ name: 'VIRGIL VAN DIJK', pos: 'DF', ovr: 87 }, { name: 'CODY GAKPO', pos: 'FW', ovr: 84 }, { name: 'FRENKIE DE JONG', pos: 'MF', ovr: 86 }, { name: 'MEMPHIS DEPAY', pos: 'FW', ovr: 83 }],
+  belgium:    [{ name: 'KEVIN DE BRUYNE', pos: 'MF', ovr: 88 }, { name: 'ROMELU LUKAKU', pos: 'FW', ovr: 84 }, { name: 'JEREMY DOKU', pos: 'FW', ovr: 83 }],
+  italy:      [{ name: 'NICOLO BARELLA', pos: 'MF', ovr: 86 }, { name: 'FEDERICO CHIESA', pos: 'FW', ovr: 84 }, { name: 'GIANLUIGI DONNARUMMA', pos: 'GK', ovr: 87 }, { name: 'ALESSANDRO BASTONI', pos: 'DF', ovr: 85 }],
+  croatia:    [{ name: 'LUKA MODRIC', pos: 'MF', ovr: 85 }, { name: 'JOSKO GVARDIOL', pos: 'DF', ovr: 85 }, { name: 'MATEO KOVACIC', pos: 'MF', ovr: 83 }],
+  uruguay:    [{ name: 'FEDERICO VALVERDE', pos: 'MF', ovr: 88 }, { name: 'DARWIN NUNEZ', pos: 'FW', ovr: 83 }, { name: 'RONALD ARAUJO', pos: 'DF', ovr: 85 }],
+  colombia:   [{ name: 'LUIS DIAZ', pos: 'FW', ovr: 86 }, { name: 'JAMES RODRIGUEZ', pos: 'MF', ovr: 82 }, { name: 'JHON DURAN', pos: 'FW', ovr: 80 }],
+  usa:        [{ name: 'CHRISTIAN PULISIC', pos: 'FW', ovr: 84 }, { name: 'WESTON MCKENNIE', pos: 'MF', ovr: 81 }, { name: 'ANTONEE ROBINSON', pos: 'DF', ovr: 81 }],
+  mexico:     [{ name: 'EDSON ALVAREZ', pos: 'MF', ovr: 82 }, { name: 'SANTIAGO GIMENEZ', pos: 'FW', ovr: 82 }, { name: 'HIRVING LOZANO', pos: 'FW', ovr: 81 }],
+  canada:     [{ name: 'ALPHONSO DAVIES', pos: 'DF', ovr: 85 }, { name: 'JONATHAN DAVID', pos: 'FW', ovr: 83 }],
+  morocco:    [{ name: 'ACHRAF HAKIMI', pos: 'DF', ovr: 85 }, { name: 'BRAHIM DIAZ', pos: 'MF', ovr: 83 }, { name: 'YOUSSEF EN-NESYRI', pos: 'FW', ovr: 81 }],
+  senegal:    [{ name: 'SADIO MANE', pos: 'FW', ovr: 84 }, { name: 'NICOLAS JACKSON', pos: 'FW', ovr: 80 }, { name: 'EDOUARD MENDY', pos: 'GK', ovr: 82 }],
+  nigeria:    [{ name: 'VICTOR OSIMHEN', pos: 'FW', ovr: 87 }, { name: 'ADEMOLA LOOKMAN', pos: 'FW', ovr: 83 }],
+  egypt:      [{ name: 'MOHAMED SALAH', pos: 'FW', ovr: 89 }, { name: 'OMAR MARMOUSH', pos: 'FW', ovr: 82 }],
+  ivorycoast: [{ name: 'SEBASTIEN HALLER', pos: 'FW', ovr: 80 }, { name: 'FRANCK KESSIE', pos: 'MF', ovr: 82 }],
+  norway:     [{ name: 'ERLING HAALAND', pos: 'FW', ovr: 90 }, { name: 'MARTIN ODEGAARD', pos: 'MF', ovr: 87 }],
+  serbia:     [{ name: 'DUSAN VLAHOVIC', pos: 'FW', ovr: 84 }, { name: 'SERGEJ MILINKOVIC-SAVIC', pos: 'MF', ovr: 83 }],
+  switzerland:[{ name: 'GRANIT XHAKA', pos: 'MF', ovr: 84 }, { name: 'MANUEL AKANJI', pos: 'DF', ovr: 84 }],
+  denmark:    [{ name: 'CHRISTIAN ERIKSEN', pos: 'MF', ovr: 83 }, { name: 'RASMUS HOJLUND', pos: 'FW', ovr: 81 }],
+  ecuador:    [{ name: 'MOISES CAICEDO', pos: 'MF', ovr: 85 }, { name: 'PERVIS ESTUPINAN', pos: 'DF', ovr: 81 }],
+
   arsenal:    [{ name: 'BUKAYO SAKA', pos: 'FW', ovr: 87 }, { name: 'MARTIN ODEGAARD', pos: 'MF', ovr: 87 }, { name: 'DECLAN RICE', pos: 'MF', ovr: 86 }, { name: 'WILLIAM SALIBA', pos: 'DF', ovr: 87 }, { name: 'DAVID RAYA', pos: 'GK', ovr: 84 }],
   villa:      [{ name: 'OLLIE WATKINS', pos: 'FW', ovr: 84 }, { name: 'EMILIANO MARTINEZ', pos: 'GK', ovr: 84 }, { name: 'MORGAN ROGERS', pos: 'MF', ovr: 80 }],
   bournemouth:[{ name: 'ANTOINE SEMENYO', pos: 'FW', ovr: 80 }, { name: 'JUSTIN KLUIVERT', pos: 'MF', ovr: 78 }],
@@ -194,6 +215,41 @@ const TEAMS = [
   { id: 'eng', name: 'ENGLAND',        short: 'ENG', type: 'nation', colors: ['#f5f5f5', '#d40000'], base: 85, pool: 'en', stars: 'england',    desc: 'THE THREE LIONS' },
   { id: 'esp', name: 'SPAIN',          short: 'ESP', type: 'nation', colors: ['#d40000', '#ffd23f'], base: 85, pool: 'en', stars: 'spain',      desc: 'LA ROJA' },
   { id: 'ger', name: 'GERMANY',        short: 'GER', type: 'nation', colors: ['#0b1020', '#ffd23f'], base: 85, pool: 'en', stars: 'germany',    desc: 'DIE MANNSCHAFT' },
+  { id: 'por', name: 'PORTUGAL',       short: 'POR', type: 'nation', colors: ['#0a7a3c', '#d40000'], base: 86, pool: 'en', stars: 'portugal',   desc: 'A SELEÇÃO DAS QUINAS' },
+  { id: 'ned', name: 'NETHERLANDS',    short: 'NED', type: 'nation', colors: ['#ff8c00', '#ffffff'], base: 85, pool: 'en', stars: 'netherlands', desc: 'ORANJE' },
+  { id: 'bel', name: 'BELGIUM',        short: 'BEL', type: 'nation', colors: ['#d40000', '#ffd23f'], base: 84, pool: 'en', stars: 'belgium',    desc: 'THE RED DEVILS' },
+  { id: 'ita', name: 'ITALY',          short: 'ITA', type: 'nation', colors: ['#1b3fa0', '#ffffff'], base: 84, pool: 'en', stars: 'italy',      desc: 'GLI AZZURRI' },
+  { id: 'cro', name: 'CROATIA',        short: 'CRO', type: 'nation', colors: ['#d40000', '#ffffff'], base: 82, pool: 'en', stars: 'croatia',    desc: 'VATRENI' },
+  { id: 'uru', name: 'URUGUAY',        short: 'URU', type: 'nation', colors: ['#8fd0ff', '#0b1020'], base: 84, pool: 'en', stars: 'uruguay',    desc: 'LA CELESTE' },
+  { id: 'col', name: 'COLOMBIA',       short: 'COL', type: 'nation', colors: ['#ffd23f', '#1b3fa0'], base: 83, pool: 'en', stars: 'colombia',   desc: 'LOS CAFETEROS' },
+  { id: 'ecu', name: 'ECUADOR',        short: 'ECU', type: 'nation', colors: ['#ffd23f', '#d40000'], base: 80, pool: 'en', stars: 'ecuador',    desc: 'LA TRI' },
+  { id: 'par', name: 'PARAGUAY',       short: 'PAR', type: 'nation', colors: ['#d40000', '#1b3fa0'], base: 77, pool: 'en',                     desc: 'LA ALBIRROJA' },
+  { id: 'usa', name: 'USA',            short: 'USA', type: 'nation', colors: ['#1b3fa0', '#d40000'], base: 80, pool: 'en', stars: 'usa',        desc: 'THE STARS AND STRIPES · HOST' },
+  { id: 'mex', name: 'MEXICO',         short: 'MEX', type: 'nation', colors: ['#0a7a3c', '#ffffff'], base: 80, pool: 'en', stars: 'mexico',     desc: 'EL TRI · HOST' },
+  { id: 'can', name: 'CANADA',         short: 'CAN', type: 'nation', colors: ['#d40000', '#ffffff'], base: 79, pool: 'en', stars: 'canada',     desc: 'LES ROUGES · HOST' },
+  { id: 'crc', name: 'COSTA RICA',     short: 'CRC', type: 'nation', colors: ['#d40000', '#1b3fa0'], base: 74, pool: 'en',                     desc: 'LOS TICOS' },
+  { id: 'pan', name: 'PANAMA',         short: 'PAN', type: 'nation', colors: ['#d40000', '#1b3fa0'], base: 74, pool: 'en',                     desc: 'LA MAREA ROJA' },
+  { id: 'jam', name: 'JAMAICA',        short: 'JAM', type: 'nation', colors: ['#ffd23f', '#0a7a3c'], base: 74, pool: 'en',                     desc: 'THE REGGAE BOYZ' },
+  { id: 'mar', name: 'MOROCCO',        short: 'MAR', type: 'nation', colors: ['#7a1029', '#0a7a3c'], base: 83, pool: 'sa', stars: 'morocco',    desc: 'THE ATLAS LIONS' },
+  { id: 'sen', name: 'SENEGAL',        short: 'SEN', type: 'nation', colors: ['#0a7a3c', '#ffd23f'], base: 82, pool: 'en', stars: 'senegal',    desc: 'THE LIONS OF TERANGA' },
+  { id: 'nga', name: 'NIGERIA',        short: 'NGA', type: 'nation', colors: ['#0a7a3c', '#ffffff'], base: 81, pool: 'en', stars: 'nigeria',    desc: 'THE SUPER EAGLES' },
+  { id: 'egy', name: 'EGYPT',          short: 'EGY', type: 'nation', colors: ['#d40000', '#0b1020'], base: 80, pool: 'sa', stars: 'egypt',      desc: 'THE PHARAOHS' },
+  { id: 'alg', name: 'ALGERIA',        short: 'ALG', type: 'nation', colors: ['#0a7a3c', '#ffffff'], base: 79, pool: 'sa',                     desc: 'THE DESERT FOXES' },
+  { id: 'civ', name: 'IVORY COAST',    short: 'CIV', type: 'nation', colors: ['#ff8c00', '#0a7a3c'], base: 79, pool: 'en', stars: 'ivorycoast', desc: 'THE ELEPHANTS' },
+  { id: 'cmr', name: 'CAMEROON',       short: 'CMR', type: 'nation', colors: ['#0a7a3c', '#d40000'], base: 78, pool: 'en',                     desc: 'THE INDOMITABLE LIONS' },
+  { id: 'gha', name: 'GHANA',          short: 'GHA', type: 'nation', colors: ['#d40000', '#ffd23f'], base: 78, pool: 'en',                     desc: 'THE BLACK STARS' },
+  { id: 'tun', name: 'TUNISIA',        short: 'TUN', type: 'nation', colors: ['#d40000', '#ffffff'], base: 77, pool: 'sa',                     desc: 'THE EAGLES OF CARTHAGE' },
+  { id: 'uzb', name: 'UZBEKISTAN',     short: 'UZB', type: 'nation', colors: ['#38e1ff', '#ffffff'], base: 75, pool: 'en',                     desc: 'THE WHITE WOLVES' },
+  { id: 'jor', name: 'JORDAN',         short: 'JOR', type: 'nation', colors: ['#d40000', '#0b1020'], base: 74, pool: 'sa',                     desc: 'THE CHIVALROUS ONES' },
+  { id: 'nzl', name: 'NEW ZEALAND',    short: 'NZL', type: 'nation', colors: ['#0b1020', '#ffffff'], base: 72, pool: 'en',                     desc: 'THE ALL WHITES' },
+  { id: 'sco', name: 'SCOTLAND',       short: 'SCO', type: 'nation', colors: ['#12295e', '#ffffff'], base: 79, pool: 'en',                     desc: 'THE TARTAN ARMY' },
+  { id: 'nor', name: 'NORWAY',         short: 'NOR', type: 'nation', colors: ['#d40000', '#1b3fa0'], base: 81, pool: 'en', stars: 'norway',     desc: 'LØVENE' },
+  { id: 'srb', name: 'SERBIA',         short: 'SRB', type: 'nation', colors: ['#d40000', '#1b3fa0'], base: 80, pool: 'en', stars: 'serbia',     desc: 'THE EAGLES' },
+  { id: 'sui', name: 'SWITZERLAND',    short: 'SUI', type: 'nation', colors: ['#d40000', '#ffffff'], base: 80, pool: 'en', stars: 'switzerland', desc: 'LA NATI' },
+  { id: 'den', name: 'DENMARK',        short: 'DEN', type: 'nation', colors: ['#d40000', '#ffffff'], base: 81, pool: 'en', stars: 'denmark',    desc: 'DE RØD-HVIDE' },
+  { id: 'aut', name: 'AUSTRIA',        short: 'AUT', type: 'nation', colors: ['#d40000', '#ffffff'], base: 80, pool: 'en',                     desc: 'DAS TEAM' },
+  { id: 'tur', name: 'TURKEY',         short: 'TUR', type: 'nation', colors: ['#d40000', '#ffffff'], base: 80, pool: 'en',                     desc: 'AY-YILDIZLILAR' },
+  { id: 'pol', name: 'POLAND',         short: 'POL', type: 'nation', colors: ['#d40000', '#ffffff'], base: 79, pool: 'en',                     desc: 'BIAŁO-CZERWONI' },
 
   /* --- Liga 1 clubs --- */
   { id: 'psj', name: 'PERSIJA JAKARTA', short: 'PSJ', type: 'club', colors: ['#e63946', '#ff8c00'], base: 74, pool: 'id', desc: 'MACAN KEMAYORAN' },
@@ -209,6 +265,16 @@ const TEAMS = [
 ];
 
 const EPL_IDS = TEAMS.filter(t => t.type === 'epl').map(t => t.id);
+
+/* World Cup 2026 field — 48 real participating/host nations (+ Indonesia wildcard) */
+const WC2026_IDS = [
+  'usa', 'mex', 'can',                                                   // hosts
+  'arg', 'bra', 'fra', 'esp', 'eng', 'por', 'ned', 'ger',               // top seeds
+  'bel', 'ita', 'cro', 'uru', 'col', 'mar', 'sen', 'jpn', 'kor',
+  'nga', 'egy', 'civ', 'ecu', 'nor', 'srb', 'sui', 'den', 'sco',
+  'irn', 'ksa', 'aus', 'qat', 'uzb', 'jor', 'alg', 'cmr', 'gha',
+  'tun', 'par', 'aut', 'tur', 'pol', 'crc', 'pan', 'jam', 'nzl', 'idn'
+];
 
 /* ---- squad generation ---- */
 function statsFor(pos, ovr) {

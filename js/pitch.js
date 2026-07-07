@@ -137,9 +137,12 @@ function drawPitchBg(c, W, H) {
   c.strokeRect(W - 64, H / 2 - 62, 56, 124);
   c.strokeRect(8, H / 2 - 30, 22, 60);
   c.strokeRect(W - 30, H / 2 - 30, 22, 60);
-  // goals
-  px(c, 2, H / 2 - 22, 6, 44, '#e8ecff');
-  px(c, W - 8, H / 2 - 22, 6, 44, '#e8ecff');
+  // goals with a pixel net mesh
+  [2, W - 8].forEach(x0 => {
+    px(c, x0, H / 2 - 22, 6, 44, 'rgba(232,236,255,.85)');
+    for (let y = H / 2 - 22; y <= H / 2 + 22; y += 3) px(c, x0, y, 6, 1, 'rgba(11,16,32,.35)');
+    for (let x = 0; x <= 6; x += 2) px(c, x0 + x, H / 2 - 22, 1, 44, 'rgba(11,16,32,.30)');
+  });
 }
 
 /* draw a little top-down player: shirt blob + head + shadow */
@@ -175,6 +178,9 @@ class MatchScene {
     this.attackSide = 'home';
     this.flash = 0;         // goal flash frames
     this.confetti = [];
+    this.shake = 0;         // screen-shake frames
+    this.celebrate = 0;     // freeze/celebration frames
+    this.netRipple = { side: null, t: 0 };
     this.momentum = 0.5;    // 0 = away pressing, 1 = home pressing
     this.setAttack(Math.random() < 0.5 ? 'home' : 'away');
     this.players = this.makePlayers();
@@ -204,25 +210,47 @@ class MatchScene {
     this.ball.ty = 0.18 + Math.random() * 0.64;
   }
 
-  goal(side) {
-    this.flash = 24;
+  goal(side, player) {
+    this.flash = 34;
+    this.shake = 18;
+    this.celebrate = 46;             // freeze the ball in the net a beat
     const W = this.canvas.width, H = this.canvas.height;
+    const special = player && (player.legend || player.icon);
     const gx = side === 'home' ? W - 10 : 10;
-    for (let i = 0; i < 60; i++) {
+    this.netRipple = { side, t: 26 };
+    // snap the ball into the scoring goal, then let the celebration ride
+    this.ball.x = side === 'home' ? 0.985 : 0.015;
+    this.ball.y = 0.5;
+    this.ball.tx = this.ball.x; this.ball.ty = this.ball.y;
+    const cols = special
+      ? ['#ffd23f', '#ffe27a', '#fff7cf', '#ff9df5']
+      : ['#ffd23f', '#ff4757', '#38e1ff', '#dff0d4'];
+    const burst = special ? 130 : 90;
+    for (let i = 0; i < burst; i++) {
+      const a = Math.random() * Math.PI * 2, sp = 1 + Math.random() * 6;
       this.confetti.push({
         x: gx, y: H / 2,
-        vx: (Math.random() - (side === 'home' ? 0.8 : 0.2)) * 6,
-        vy: (Math.random() - 0.5) * 6,
-        life: 30 + Math.random() * 30,
-        col: ['#ffd23f', '#ff4757', '#38e1ff', '#dff0d4'][i % 4]
+        vx: Math.cos(a) * sp * (side === 'home' ? -1 : 1) - (side === 'home' ? 1.5 : -1.5),
+        vy: Math.sin(a) * sp - 1.5,
+        life: 34 + Math.random() * 40,
+        col: cols[i % cols.length]
       });
     }
-    this.ball.x = 0.5; this.ball.y = 0.5;
-    this.setAttack(side === 'home' ? 'away' : 'home');
   }
 
   tick() {
     this.frame++;
+    if (this.shake > 0) this.shake--;
+    if (this.netRipple.t > 0) this.netRipple.t--;
+    // during the celebration freeze, keep the ball parked in the net
+    if (this.celebrate > 0) {
+      this.celebrate--;
+      this.confetti = this.confetti.filter(f => f.life-- > 0);
+      this.confetti.forEach(f => { f.x += f.vx; f.y += f.vy; f.vy += 0.12; });
+      if (this.flash > 0) this.flash--;
+      if (this.celebrate === 0) this.setAttack(this.attackSide === 'home' ? 'away' : 'home');
+      return;
+    }
     // ball drifts to target; new target when reached
     const b = this.ball;
     const dx = b.tx - b.x, dy = b.ty - b.y;
@@ -253,7 +281,14 @@ class MatchScene {
 
   render() {
     const c = this.ctx, W = this.canvas.width, H = this.canvas.height;
+    c.save();
+    if (this.shake > 0) {
+      const s = this.shake / 3;
+      c.translate((Math.random() - 0.5) * s, (Math.random() - 0.5) * s);
+    }
     drawPitchBg(c, W, H);
+    // net ripple at the scoring goal
+    if (this.netRipple.t > 0) drawNetRipple(c, W, H, this.netRipple.side, this.netRipple.t);
     // players (away first so home renders on top when overlapping)
     const kit = t => t.colors;
     this.players.forEach(p => {
@@ -268,11 +303,25 @@ class MatchScene {
     px(c, bx - 1, by - 1, 2, 2, '#05070f');
     // confetti
     this.confetti.forEach(f => px(c, f.x, f.y, 3, 3, f.col));
-    // goal flash
+    c.restore();
+    // goal flash (over the shake so it fills the frame)
     if (this.flash > 0 && this.flash % 4 < 2) {
-      c.fillStyle = 'rgba(255, 210, 63, .18)';
+      c.fillStyle = 'rgba(255, 210, 63, .20)';
       c.fillRect(0, 0, W, H);
     }
+  }
+}
+
+/* net mesh that wobbles when the ball hits it */
+function drawNetRipple(c, W, H, side, t) {
+  const x0 = side === 'home' ? W - 8 : 2;
+  const gy = H / 2 - 22, gh = 44, gw = 6;
+  for (let y = 0; y <= gh; y += 3) {
+    const wob = Math.sin((y + t * 3) * 0.5) * (t / 12);
+    px(c, x0 + wob, gy + y, gw, 1, 'rgba(255,255,255,.5)');
+  }
+  for (let x = 0; x <= gw; x += 2) {
+    px(c, x0 + x, gy, 1, gh, 'rgba(255,255,255,.35)');
   }
 }
 
