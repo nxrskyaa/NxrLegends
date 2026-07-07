@@ -367,6 +367,13 @@ canvas { image-rendering: pixelated; }
 .player-card.r-gold   { outline-color: var(--gold2); }
 .player-card.r-hero   { outline-color: #c77dff; }
 .player-card.r-hero .pc-ovr { background: #3d1466; }
+.player-card.r-icon {
+  outline-color: var(--cyan);
+  background: linear-gradient(180deg, #08333f, #041820);
+}
+.player-card.r-icon .pc-ovr { background: var(--cyan); color: #002028; }
+.player-card.r-icon .pc-stats b { color: #7fefff; }
+.slot.icon-slot { outline-color: var(--cyan); }
 
 /* chooser overlay */
 .chooser { position: fixed; inset: 0; z-index: 50; background: rgba(5,7,15,.85); display: flex; align-items: center; justify-content: center; padding: 16px; }
@@ -384,6 +391,29 @@ canvas { image-rendering: pixelated; }
 .chooser-row:hover { outline-color: var(--gold); }
 .chooser-row canvas { width: 26px; height: 26px; }
 .chooser-row .cr-ovr { margin-left: auto; color: var(--gold); }
+
+/* ---------------- pre-match: squad + tactics ---------------- */
+.pm-versus {
+  display: flex; align-items: center; justify-content: center; gap: 20px; flex-wrap: wrap;
+  background: var(--panel); outline: var(--px) solid var(--shadow); padding: 14px; margin-bottom: 16px;
+}
+.pm-versus .pmv-team { display: flex; align-items: center; gap: 10px; font-size: 10px; }
+.pm-versus canvas { width: 44px; height: 44px; }
+.pm-versus .pmv-ovr { font-size: 8px; color: var(--dim); }
+.pm-versus .pmv-x { font-size: 18px; color: var(--red); text-shadow: 2px 2px 0 var(--shadow); }
+.pm-layout { display: grid; grid-template-columns: minmax(280px, 380px) 1fr; gap: 20px; align-items: start; }
+.pm-section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+.pm-section-head .panel-title { margin-bottom: 0; }
+.pm-tactics { display: flex; flex-direction: column; gap: 20px; }
+.tac-block { background: var(--panel); outline: var(--px) solid var(--shadow); padding: 14px; }
+.seg.vert { flex-direction: column; gap: 6px; margin: 10px 0; }
+.seg.vert .px-tab { text-align: left; }
+.tac-desc { font-size: 8px; color: var(--cyan); line-height: 1.8; min-height: 24px; }
+.pm-actions { display: flex; justify-content: center; padding: 24px 0 40px; }
+
+@media (max-width: 760px) {
+  .pm-layout { grid-template-columns: 1fr; }
+}
 
 /* ---------------- gacha store ---------------- */
 .store-hint { font-size: 8px; color: var(--dim); line-height: 1.9; margin-bottom: 18px; }
@@ -431,6 +461,15 @@ canvas { image-rendering: pixelated; }
 .reveal-card.r-silver { outline-color: #8b96c9; }
 .reveal-card.r-gold { outline-color: var(--gold2); }
 .reveal-card.r-hero { outline-color: #c77dff; }
+.reveal-card.r-icon {
+  outline-color: var(--cyan);
+  background: linear-gradient(180deg, #08333f, #041820);
+  animation: cardIn .4s steps(6) forwards, iconGlow 1.4s steps(4) infinite;
+}
+@keyframes iconGlow {
+  0%, 100% { box-shadow: 0 6px 0 var(--shadow), 0 0 0 0 rgba(56,225,255,0); }
+  50% { box-shadow: 0 6px 0 var(--shadow), 0 0 16px 2px rgba(56,225,255,.45); }
+}
 .reveal-card.r-legend {
   outline-color: var(--gold);
   background: linear-gradient(180deg, #4d3b00, #1c1400);

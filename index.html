@@ -39,7 +39,7 @@
   <!-- ============ MY SQUAD ============ -->
   <section id="screen-squad" class="screen">
     <header class="topbar">
-      <button class="px-btn small" data-nav="title">&#9668; BACK</button>
+      <button class="px-btn small" id="squad-back">&#9668; BACK</button>
       <h2>MY SQUAD</h2>
       <div class="coins-chip" id="squad-coins"></div>
     </header>
@@ -111,6 +111,41 @@
     <div id="hub-panel-table" class="hub-panel"></div>
     <div id="hub-panel-fixtures" class="hub-panel"></div>
     <div id="hub-panel-squad" class="hub-panel"></div>
+  </section>
+
+  <!-- ============ PRE-MATCH: SQUAD + TACTICS ============ -->
+  <section id="screen-prematch" class="screen">
+    <header class="topbar">
+      <button class="px-btn small" id="pm-back">&#9668; BACK</button>
+      <h2>TEAM TALK</h2>
+      <span class="topbar-hint" id="pm-md"></span>
+    </header>
+    <div class="pm-versus" id="pm-versus"></div>
+    <div class="pm-layout">
+      <div class="pm-squad">
+        <div class="pm-section-head">
+          <h3 class="panel-title">STARTING XI — <span id="pm-formation"></span> · OVR <span id="pm-ovr"></span></h3>
+          <button class="px-btn small gold" id="pm-edit">&#9873; EDIT SQUAD</button>
+        </div>
+        <div id="pm-pitch" class="squad-pitch"></div>
+      </div>
+      <div class="pm-tactics">
+        <h3 class="panel-title">CUSTOM TACTICS</h3>
+        <div class="tac-block">
+          <span class="px-label">MENTALITY</span>
+          <div class="seg vert" id="pm-mentality"></div>
+          <p class="tac-desc" id="pm-mentality-desc"></p>
+        </div>
+        <div class="tac-block">
+          <span class="px-label">PRESSING</span>
+          <div class="seg vert" id="pm-pressing"></div>
+          <p class="tac-desc" id="pm-pressing-desc"></p>
+        </div>
+      </div>
+    </div>
+    <div class="pm-actions">
+      <button class="px-btn big gold" id="pm-kickoff">KICK OFF &#9658;</button>
+    </div>
   </section>
 
   <!-- ============ MATCH ============ -->

@@ -8,6 +8,8 @@ Open gacha packs, build your ultimate squad, take on the English league in a per
 - 🎴 **Gacha Store** — Bronze / Silver / Gold / Legend packs with animated pixel card reveals. Duplicates auto-convert to coins. NXRSKYAA hides in Gold (1.5%) and Legend (5%) packs.
 - 🧩 **My Squad** — build your club from your collection: pick a formation (4-4-2, 4-3-3, 3-5-2, 5-3-2), place players slot by slot on a vertical pixel pitch, auto best XI, rename your club, sell spares.
 - 🏆 **The 38-0 Challenge** — your squad + 19 English league clubs (Arsenal, Liverpool, Man City, Chelsea, Spurs and more, each seeded with their real stars), home & away, 38 matches. Win them all.
+- 🎽 **Team Talk (pre-match)** — before every kick-off, review your starting XI on the pitch, jump straight into squad editing, and set **custom tactics**: mentality (Defensive / Balanced / Attacking / All-Out) and pressing (Low Block / Medium / High Press). Your choices measurably change how the match plays out.
+- ⚜️ **Hall of Legends** — icons like Cristiano Ronaldo, Messi, Zidane, Ronaldinho, Maldini, Ibrahimović, Henry and 17 more, pullable as ICON cards from Gold & Legend packs, collectible into your dream team, or faced as the **FINAL BOSS** club in a custom league.
 - 🕹️ **Top-down pixel match engine** — animated pitch, pixel players, goal confetti, live commentary, retro chiptune SFX, 1x/2x speed and skip.
 - 🇮🇩 **Timnas Indonesia database** — the full Indonesia national squad (Jay Idzes, Maarten Paes, Thom Haye, Marselino Ferdinan and more) plus Asian nations and Liga 1 clubs, all browsable and all in the gacha pool.
 - ⭐ **NXRSKYAA** — special legend character, 99 in every stat, golden crown, own showcase page, special commentary and fanfare when he scores.

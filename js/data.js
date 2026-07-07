@@ -35,6 +35,34 @@ const NXRSKYAA = {
         'Some say the 38-0 season is impossible. The Legend says: watch me.'
 };
 
+/* ---- Hall of Legends: iconic players as gacha legend pulls (names are facts; ratings are ours) ---- */
+const LEGENDS_SQUAD = [
+  { name: 'GIANLUIGI BUFFON',   pos: 'GK', ovr: 92, icon: true },
+  { name: 'IKER CASILLAS',      pos: 'GK', ovr: 92, icon: true },
+  { name: 'PAOLO MALDINI',      pos: 'DF', ovr: 94, icon: true },
+  { name: 'FABIO CANNAVARO',    pos: 'DF', ovr: 92, icon: true },
+  { name: 'CARLES PUYOL',       pos: 'DF', ovr: 91, icon: true },
+  { name: 'ROBERTO CARLOS',     pos: 'DF', ovr: 92, icon: true },
+  { name: 'CAFU',               pos: 'DF', ovr: 91, icon: true },
+  { name: 'RIO FERDINAND',      pos: 'DF', ovr: 91, icon: true },
+  { name: 'ZINEDINE ZIDANE',    pos: 'MF', ovr: 95, icon: true },
+  { name: 'XAVI',               pos: 'MF', ovr: 93, icon: true },
+  { name: 'ANDRES INIESTA',     pos: 'MF', ovr: 93, icon: true },
+  { name: 'RONALDINHO',         pos: 'MF', ovr: 93, icon: true },
+  { name: 'ANDREA PIRLO',       pos: 'MF', ovr: 92, icon: true },
+  { name: 'STEVEN GERRARD',     pos: 'MF', ovr: 92, icon: true },
+  { name: 'FRANK LAMPARD',      pos: 'MF', ovr: 91, icon: true },
+  { name: 'DAVID BECKHAM',      pos: 'MF', ovr: 91, icon: true },
+  { name: 'CRISTIANO RONALDO',  pos: 'FW', ovr: 94, icon: true },
+  { name: 'LIONEL MESSI',       pos: 'FW', ovr: 94, icon: true },
+  { name: 'RONALDO NAZARIO',    pos: 'FW', ovr: 94, icon: true },
+  { name: 'THIERRY HENRY',      pos: 'FW', ovr: 93, icon: true },
+  { name: 'ZLATAN IBRAHIMOVIC', pos: 'FW', ovr: 92, icon: true },
+  { name: 'DIDIER DROGBA',      pos: 'FW', ovr: 91, icon: true },
+  { name: 'WAYNE ROONEY',       pos: 'FW', ovr: 91, icon: true },
+  { name: 'GABRIEL BATISTUTA',  pos: 'FW', ovr: 91, icon: true }
+];
+
 /* ---- Timnas Indonesia squad (real national team roster names; ratings are game values) ---- */
 const INDONESIA_SQUAD = [
   { name: 'MAARTEN PAES',        pos: 'GK', ovr: 82 },
@@ -119,6 +147,8 @@ const STARS = {
 const TEAMS = [
   { id: 'idn', name: 'INDONESIA',      short: 'IDN', type: 'nation', colors: ['#e63946', '#ffffff'], base: 78, pool: 'id', squad: INDONESIA_SQUAD, hasLegend: true,
     desc: 'TIMNAS GARUDA — THE HOME OF THE LEGEND' },
+  { id: 'leg', name: 'HALL OF LEGENDS', short: 'LEG', type: 'legends', colors: ['#ffd23f', '#0b1020'], base: 92, pool: 'en', squad: LEGENDS_SQUAD,
+    desc: 'THE GREATEST OF ALL TIME — FINAL BOSS' },
 
   /* --- English league clubs --- */
   { id: 'ars', name: 'ARSENAL',        short: 'ARS', type: 'epl', colors: ['#e63946', '#ffffff'], base: 83, pool: 'en', stars: 'arsenal',     desc: 'THE GUNNERS' },
@@ -240,14 +270,16 @@ DB.forEach(t => {
   t.squadFull.forEach((p, i) => { p.pid = t.id + ':' + i; p.teamId = t.id; });
 });
 
-/* pid -> { player, team } index; gacha pool (legend excluded from normal pulls) */
+/* pid -> { player, team } index; pools (icons & the Legend excluded from normal pulls) */
 const PLAYER_INDEX = {};
 DB.forEach(t => t.squadFull.forEach(p => PLAYER_INDEX[p.pid] = { player: p, team: t }));
-const GACHA_POOL = Object.values(PLAYER_INDEX).map(e => e.player).filter(p => !p.legend);
+const GACHA_POOL = Object.values(PLAYER_INDEX).map(e => e.player).filter(p => !p.legend && !p.icon);
+const ICON_POOL = Object.values(PLAYER_INDEX).map(e => e.player).filter(p => p.icon);
 
 /* rarity tiers */
 function rarityOf(p) {
   if (p.legend) return 'legend';
+  if (p.icon) return 'icon';
   if (p.ovr >= 89) return 'hero';
   if (p.ovr >= 81) return 'gold';
   if (p.ovr >= 73) return 'silver';
@@ -255,6 +287,7 @@ function rarityOf(p) {
 }
 function sellValue(p) {
   if (p.legend) return 5000;
+  if (p.icon) return 3000;
   if (p.ovr >= 89) return 1500;
   if (p.ovr >= 81) return 600;
   if (p.ovr >= 73) return 250;

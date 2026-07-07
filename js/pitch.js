@@ -99,6 +99,9 @@ function drawFace(canvas, player, teamColors, size) {
     px(c, 3 * u, 0, u, u, '#ffd23f');
     px(c, 5 * u, 0, u, u, '#ffd23f');
     px(c, 7 * u, 0, u, u, '#ffd23f');
+  } else if (player.icon) {
+    // cyan icon headband
+    px(c, 2 * u, 2 * u, 7 * u, u, '#38e1ff');
   }
 }
 

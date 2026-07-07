@@ -57,12 +57,18 @@ function newSeason(userTeamId, teamIds, rounds, leagueName) {
     leagueName,
     user: userTeamId,
     teams: teamIds,
-    fixtures: makeFixtures(teamIds, rounds)
+    fixtures: makeFixtures(teamIds, rounds),
+    tactics: { ...(COLL.tactics || defaultTactics()) }
   };
   saveSeason();
 }
 function saveSeason() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(SEASON)); } catch (e) {} }
-function loadSeason() { try { const s = localStorage.getItem(SAVE_KEY); if (s) SEASON = JSON.parse(s); } catch (e) {} }
+function loadSeason() {
+  try {
+    const s = localStorage.getItem(SAVE_KEY);
+    if (s) { SEASON = JSON.parse(s); if (!SEASON.tactics) SEASON.tactics = defaultTactics(); }
+  } catch (e) {}
+}
 function clearSeason() { SEASON = null; try { localStorage.removeItem(SAVE_KEY); } catch (e) {} }
 
 function userMatches() { return SEASON.fixtures.filter(f => f.home === SEASON.user || f.away === SEASON.user); }
@@ -200,6 +206,17 @@ function shortName(n) {
 $('#club-name').addEventListener('change', () => {
   COLL.club = ($('#club-name').value.trim() || 'NXR FC').toUpperCase();
   saveCollection();
+});
+
+$('#squad-back').addEventListener('click', () => {
+  SFX.nav();
+  if (SQUAD_RETURN) {
+    const fx = SQUAD_RETURN;
+    SQUAD_RETURN = null;
+    showPrematch(fx);
+  } else {
+    show('title');
+  }
 });
 
 $('#btn-auto-xi').addEventListener('click', () => {
@@ -400,8 +417,118 @@ function renderNextPanel() {
     el.appendChild(cv);
     el.insertAdjacentHTML('beforeend', `<div class="nm-name">${t.name}</div><div class="nm-ovr">OVR ${Math.round(t.str)}</div>`);
   });
-  $('#btn-play').addEventListener('click', () => { SFX.whistle(); startMatch(fx); });
+  $('#btn-play').addEventListener('click', () => { SFX.click(); showPrematch(fx); });
 }
+
+/* ============================================================
+   PRE-MATCH: SQUAD + CUSTOM TACTICS
+   ============================================================ */
+let PENDING_FIXTURE = null;
+let SQUAD_RETURN = null;
+
+function previewXI(team) {
+  if (team.id === USER_TEAM_ID) return { players: resolvedXI(), formation: COLL.formation };
+  return { players: bestXI(team.squadFull), formation: '4-4-2' };
+}
+
+function renderPreviewPitch(container, players, formationKey, colors) {
+  container.innerHTML = '';
+  const form = FORMATIONS[formationKey] || FORMATIONS['4-4-2'];
+  form.slots.forEach((pos, i) => {
+    const p = players[i];
+    const slot = document.createElement('div');
+    slot.className = 'slot' + (p && p.legend ? ' legend-slot' : '') + (p && p.icon ? ' icon-slot' : '');
+    slot.style.left = form.xy[i][0] + '%';
+    slot.style.top = form.xy[i][1] + '%';
+    if (p) {
+      const cv = document.createElement('canvas');
+      drawFace(cv, p, colors, 28);
+      slot.appendChild(cv);
+      slot.insertAdjacentHTML('beforeend',
+        `<span class="slot-pos">${pos}</span>${shortName(p.name)}<br><span class="slot-ovr">${p.ovr}</span>`);
+    } else {
+      slot.classList.add('empty');
+      slot.insertAdjacentHTML('beforeend', `<span class="slot-pos">${pos}</span>—`);
+    }
+    container.appendChild(slot);
+  });
+}
+
+function showPrematch(fixture) {
+  PENDING_FIXTURE = fixture;
+  const home = getTeam(fixture.home), away = getTeam(fixture.away);
+  const userTeam = getTeam(SEASON.user);
+  const oppTeam = SEASON.user === fixture.home ? away : home;
+
+  $('#pm-md').textContent = `MATCHDAY ${fixture.md} · ${home.short} (H) v ${away.short} (A)`;
+
+  // versus banner
+  const vs = $('#pm-versus');
+  vs.innerHTML = '';
+  [[userTeam, 'YOUR SIDE'], [oppTeam, 'OPPONENT']].forEach(([t, label], idx) => {
+    if (idx === 1) vs.insertAdjacentHTML('beforeend', '<span class="pmv-x">VS</span>');
+    const wrap = document.createElement('div');
+    wrap.className = 'pmv-team';
+    const cv = document.createElement('canvas');
+    drawCrest(cv, t, 44);
+    wrap.appendChild(cv);
+    wrap.insertAdjacentHTML('beforeend',
+      `<div><div>${t.name}${t.hasLegend ? ' ★' : ''}</div><div class="pmv-ovr">${label} · OVR ${Math.round(t.str)}</div></div>`);
+    vs.appendChild(wrap);
+  });
+
+  // XI preview
+  const prev = previewXI(userTeam);
+  $('#pm-formation').textContent = prev.formation;
+  $('#pm-ovr').textContent = Math.round(userTeam.str);
+  renderPreviewPitch($('#pm-pitch'), prev.players, prev.formation, userTeam.colors);
+  $('#pm-edit').style.display = SEASON.user === USER_TEAM_ID ? '' : 'none';
+
+  renderTacticsControls();
+  show('prematch');
+}
+
+function renderTacticsControls() {
+  const tac = SEASON.tactics;
+  const mSeg = $('#pm-mentality');
+  mSeg.innerHTML = '';
+  Object.entries(MENTALITIES).forEach(([key, m]) => {
+    const b = document.createElement('button');
+    b.className = 'px-tab' + (tac.mentality === key ? ' active' : '');
+    b.textContent = m.name;
+    b.addEventListener('click', () => {
+      SFX.click();
+      SEASON.tactics.mentality = key; saveSeason();
+      renderTacticsControls();
+    });
+    mSeg.appendChild(b);
+  });
+  $('#pm-mentality-desc').textContent = MENTALITIES[tac.mentality].desc;
+
+  const pSeg = $('#pm-pressing');
+  pSeg.innerHTML = '';
+  Object.entries(PRESSING).forEach(([key, p]) => {
+    const b = document.createElement('button');
+    b.className = 'px-tab' + (tac.pressing === key ? ' active' : '');
+    b.textContent = p.name;
+    b.addEventListener('click', () => {
+      SFX.click();
+      SEASON.tactics.pressing = key; saveSeason();
+      renderTacticsControls();
+    });
+    pSeg.appendChild(b);
+  });
+  $('#pm-pressing-desc').textContent = PRESSING[tac.pressing].desc;
+}
+
+$('#pm-back').addEventListener('click', () => { SFX.nav(); renderHub(); show('hub'); });
+$('#pm-edit').addEventListener('click', () => {
+  SFX.nav();
+  SQUAD_RETURN = PENDING_FIXTURE;
+  renderSquadScreen();
+  show('squad');
+});
+$('#pm-kickoff').addEventListener('click', () => { SFX.whistle(); startMatch(PENDING_FIXTURE); });
 
 function renderTablePanel() {
   const table = computeTable(SEASON.teams, SEASON.fixtures);
@@ -453,6 +580,9 @@ let MATCH = null;
 
 function startMatch(fixture) {
   const home = getTeam(fixture.home), away = getTeam(fixture.away);
+  // apply the season's custom tactics to whichever side the manager controls
+  if (SEASON.user === fixture.home) home.tactics = SEASON.tactics;
+  else if (SEASON.user === fixture.away) away.tactics = SEASON.tactics;
   const sim = simulateMatch(home, away);
   MATCH = {
     fixture, home, away, sim,
@@ -737,7 +867,9 @@ function renderDbSquad(team) {
 function renderLegend() {
   const stage = $('#legend-stage');
   stage.innerHTML = '';
-  const owned = COLL.owned.includes('idn:0');
+  const ownedNxr = COLL.owned.includes('idn:0');
+
+  // headliner: NXRSKYAA
   const card = document.createElement('div');
   card.className = 'legend-big-card';
   const cv = document.createElement('canvas');
@@ -746,15 +878,34 @@ function renderLegend() {
   card.insertAdjacentHTML('beforeend', `
     <h3>${NXRSKYAA.name}</h3>
     <div class="lg-ovr">99 OVR</div>
-    <div class="lg-pos">FW — TIMNAS INDONESIA ★${owned ? ' · IN YOUR COLLECTION!' : ''}</div>
+    <div class="lg-pos">FW — TIMNAS INDONESIA ★${ownedNxr ? ' · IN YOUR COLLECTION!' : ''}</div>
     <div class="legend-stats">
       ${Object.entries(NXRSKYAA.stats).map(([k, v]) => `<div>${k}<b>${v}</b></div>`).join('')}
     </div>`);
   stage.appendChild(card);
   stage.insertAdjacentHTML('beforeend', `<p class="legend-lore">${NXRSKYAA.lore}</p>
-    ${owned
+    ${ownedNxr
       ? '<button class="px-btn big gold" onclick="navTo(\'squad\')">PUT HIM IN YOUR XI ►</button>'
       : '<button class="px-btn big gold" onclick="navTo(\'store\')">PULL HIM IN THE GACHA ►</button>'}`);
+
+  // Hall of Legends: the icons
+  const legTeam = getTeam('leg');
+  const ownedIcons = ICON_POOL.filter(p => COLL.owned.includes(p.pid)).length;
+  stage.insertAdjacentHTML('beforeend',
+    `<h3 class="panel-title" style="margin-top:30px;font-size:13px">⚜ HALL OF LEGENDS — ICONS ⚜</h3>
+     <p class="legend-lore">The greatest to ever play the game. Pull them from GOLD &amp; LEGEND packs, ` +
+    `line them up as your own dream team, or face them as the FINAL BOSS in a custom league. ` +
+    `<span style="color:var(--cyan)">COLLECTED ${ownedIcons}/${ICON_POOL.length}</span>.</p>`);
+  const grid = document.createElement('div');
+  grid.className = 'squad-grid';
+  grid.style.maxWidth = '1000px';
+  legTeam.squadFull.forEach(p => {
+    const el = playerCardEl(p, legTeam);
+    if (!COLL.owned.includes(p.pid)) el.style.opacity = '.55';
+    else el.insertAdjacentHTML('beforeend', '<div class="pc-xi-tag" style="color:#6dff8b">✓ COLLECTED</div>');
+    grid.appendChild(el);
+  });
+  stage.appendChild(grid);
   SFX.legend();
 }
 

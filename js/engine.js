@@ -24,15 +24,29 @@ const CHANT_LEGEND = [
   'GARUDA MAGIC! NXRSKYAA DOES IT AGAIN!'
 ];
 
+/* tactics multipliers from a team's chosen mentality + pressing (default = neutral) */
+function tacticsMods(team) {
+  const t = team && team.tactics;
+  const m = (t && typeof MENTALITIES !== 'undefined' && MENTALITIES[t.mentality]) || { att: 0, def: 0 };
+  const p = (t && typeof PRESSING !== 'undefined' && PRESSING[t.pressing]) || { press: 0 };
+  return {
+    att: 1 + m.att + p.press * 0.5,       // pressing high creates more chances
+    def: 1 + m.def - Math.max(0, p.press) * 0.35, // ...but leaves gaps at the back
+    tempo: 1 + Math.max(0, p.press) * 0.25        // high press = more end-to-end events
+  };
+}
+
 function attackRating(team) {
   const xi = bestXI(team.squadFull);
   const att = xi.filter(p => p.pos === 'FW' || p.pos === 'MF');
-  return att.reduce((s, p) => s + (p.pos === 'FW' ? p.ovr * 1.2 : p.ovr), 0) / att.length;
+  const base = att.reduce((s, p) => s + (p.pos === 'FW' ? p.ovr * 1.2 : p.ovr), 0) / att.length;
+  return base * tacticsMods(team).att;
 }
 function defenseRating(team) {
   const xi = bestXI(team.squadFull);
   const def = xi.filter(p => p.pos === 'DF' || p.pos === 'GK' || p.pos === 'MF');
-  return def.reduce((s, p) => s + (p.pos === 'MF' ? p.ovr * 0.8 : p.ovr), 0) / def.length;
+  const base = def.reduce((s, p) => s + (p.pos === 'MF' ? p.ovr * 0.8 : p.ovr), 0) / def.length;
+  return base * tacticsMods(team).def;
 }
 
 function pickScorer(team) {
@@ -56,8 +70,9 @@ function simulateMatch(home, away) {
 
   // convert rating edge to per-minute chance probability
   const homeEdge = 1.12; // home advantage
-  const pH = Math.max(0.008, 0.030 + (hAtt * homeEdge - aDef) * 0.0022);
-  const pA = Math.max(0.008, 0.030 + (aAtt - hDef * 1.05) * 0.0022);
+  const tempo = (tacticsMods(home).tempo + tacticsMods(away).tempo) / 2;
+  const pH = Math.max(0.008, (0.030 + (hAtt * homeEdge - aDef) * 0.0022) * tempo);
+  const pA = Math.max(0.008, (0.030 + (aAtt - hDef * 1.05) * 0.0022) * tempo);
   const convH = 0.34 + Math.max(0, hAtt - aDef) * 0.004;
   const convA = 0.34 + Math.max(0, aAtt - hDef) * 0.004;
 

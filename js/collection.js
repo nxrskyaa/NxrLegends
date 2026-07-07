@@ -18,24 +18,38 @@ const FORMATIONS = {
 
 /* pack definitions */
 const PACKS = {
-  bronze: { name: 'BRONZE PACK', cost: 400,  cards: 3, min: 58, max: 72, legendChance: 0,     desc: '3 PLAYERS · OVR 58-72',            color: '#b06f3a' },
-  silver: { name: 'SILVER PACK', cost: 1000, cards: 3, min: 68, max: 80, legendChance: 0,     desc: '3 PLAYERS · OVR 68-80',            color: '#b9c4d6' },
-  gold:   { name: 'GOLD PACK',   cost: 2500, cards: 4, min: 75, max: 99, legendChance: 0.015, desc: '4 PLAYERS · OVR 75+ · 1.5% LEGEND', color: '#ffd23f' },
-  legend: { name: 'LEGEND PACK', cost: 8000, cards: 5, min: 82, max: 99, legendChance: 0.05,  desc: '5 PLAYERS · OVR 82+ · 5% LEGEND',   color: '#ff9df5' }
+  bronze: { name: 'BRONZE PACK', cost: 400,  cards: 3, min: 58, max: 72, legendChance: 0,     iconChance: 0,    desc: '3 PLAYERS · OVR 58-72',                 color: '#b06f3a' },
+  silver: { name: 'SILVER PACK', cost: 1000, cards: 3, min: 68, max: 80, legendChance: 0,     iconChance: 0,    desc: '3 PLAYERS · OVR 68-80',                 color: '#b9c4d6' },
+  gold:   { name: 'GOLD PACK',   cost: 2500, cards: 4, min: 75, max: 88, legendChance: 0.015, iconChance: 0.05, desc: '4 PLAYERS · OVR 75+ · 5% ICON · 1.5% NXR', color: '#ffd23f' },
+  legend: { name: 'LEGEND PACK', cost: 8000, cards: 5, min: 82, max: 90, legendChance: 0.05,  iconChance: 0.22, desc: '5 PLAYERS · OVR 82+ · 22% ICON · 5% NXR',  color: '#ff9df5' }
 };
+
+/* custom tactics */
+const MENTALITIES = {
+  defensive: { name: 'DEFENSIVE',   att: -0.12, def: 0.16,  desc: 'SIT DEEP, SOAK PRESSURE, HIT ON THE BREAK' },
+  balanced:  { name: 'BALANCED',    att: 0,     def: 0,     desc: 'SOLID SHAPE, CONTROL BOTH BOXES' },
+  attacking: { name: 'ATTACKING',   att: 0.16,  def: -0.09, desc: 'PUSH NUMBERS FORWARD, TAKE THE GAME TO THEM' },
+  allout:    { name: 'ALL-OUT',     att: 0.32,  def: -0.24, desc: 'TOTAL RISK — CHASE GOALS, LEAVE GAPS' }
+};
+const PRESSING = {
+  low:    { name: 'LOW BLOCK',  press: -0.10, desc: 'CONSERVE ENERGY, STAY COMPACT' },
+  medium: { name: 'MEDIUM',     press: 0,     desc: 'BALANCED PRESS, PICK YOUR MOMENTS' },
+  high:   { name: 'HIGH PRESS', press: 0.15,  desc: 'WIN IT HIGH — MORE CHANCES, MORE RISK' }
+};
+function defaultTactics() { return { mentality: 'balanced', pressing: 'medium' }; }
 
 const ACADEMY_KID = { name: 'ACADEMY KID', pos: 'ANY', ovr: 45, stats: { PAC: 45, SHO: 45, PAS: 45, DRI: 45, DEF: 45, PHY: 45 }, pid: 'kid' };
 
 let COLL = null;
 
 function defaultCollection() {
-  return { coins: 1500, club: 'NXR FC', colors: ['#ffd23f', '#e63946'], formation: '4-4-2', owned: [], xi: [] };
+  return { coins: 1500, club: 'NXR FC', colors: ['#ffd23f', '#e63946'], formation: '4-4-2', owned: [], xi: [], tactics: defaultTactics() };
 }
 
 function loadCollection() {
   try {
     const raw = localStorage.getItem(COLL_KEY);
-    if (raw) { COLL = JSON.parse(raw); return; }
+    if (raw) { COLL = JSON.parse(raw); if (!COLL.tactics) COLL.tactics = defaultTactics(); return; }
   } catch (e) {}
   COLL = defaultCollection();
   grantStarterSquad();
@@ -72,8 +86,11 @@ function openPack(key) {
   const pulls = [];
   for (let i = 0; i < pack.cards; i++) {
     let player;
-    if (pack.legendChance > 0 && Math.random() < pack.legendChance) {
-      player = PLAYER_INDEX['idn:0'].player; // NXRSKYAA
+    const roll = Math.random();
+    if (pack.legendChance > 0 && roll < pack.legendChance) {
+      player = PLAYER_INDEX['idn:0'].player; // NXRSKYAA — the one and only 99
+    } else if (pack.iconChance > 0 && roll < pack.legendChance + pack.iconChance) {
+      player = pick(ICON_POOL); // Ronaldo, Messi, Zidane, Ibrahimovic...
     } else {
       const pool = GACHA_POOL.filter(p => p.ovr >= pack.min && p.ovr <= pack.max);
       player = pick(pool);
@@ -163,10 +180,17 @@ function getUserTeam() {
     desc: 'YOUR CLUB — BUILT FROM PACKS',
     hasLegend: xi.some(p => p.legend),
     squadFull: xi,
+    tactics: COLL.tactics || defaultTactics(),
     str: 0
   };
   team.str = xi.reduce((s, p) => s + p.ovr, 0) / xi.length;
   return team;
+}
+
+function setTactic(kind, value) {
+  if (kind === 'mentality' && MENTALITIES[value]) COLL.tactics.mentality = value;
+  if (kind === 'pressing' && PRESSING[value]) COLL.tactics.pressing = value;
+  saveCollection();
 }
 
 /* match rewards */
