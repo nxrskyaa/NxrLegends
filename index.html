@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NxrLegends — Pixel Football Legends</title>
+<meta name="description" content="NxrLegends: retro pixel-art top-down football manager. Take the Indonesia national team (or anyone) through a perfect 38-0 season, build custom leagues, and unleash the 99-rated legend Nxrskyaa.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="crt"></div>
+<div id="app">
+
+  <!-- ============ TITLE SCREEN ============ -->
+  <section id="screen-title" class="screen active">
+    <div class="title-sky">
+      <div class="px-clouds"></div>
+      <div class="title-stadium">
+        <canvas id="title-pitch" width="320" height="180"></canvas>
+      </div>
+    </div>
+    <div class="title-center">
+      <h1 class="game-logo">Nxr<span>Legends</span></h1>
+      <p class="tagline">PIXEL FOOTBALL &#9679; TOP-DOWN GLORY</p>
+      <div class="title-menu">
+        <button class="px-btn big gold" data-nav="teamselect">&#9658; SEASON MODE</button>
+        <button class="px-btn big" data-nav="customleague">&#9733; CUSTOM LEAGUE</button>
+        <button class="px-btn big" data-nav="database">&#9632; DATABASE</button>
+        <button class="px-btn big" data-nav="legend">&#9670; THE LEGEND</button>
+      </div>
+      <p class="blink press-start">FEATURING TIMNAS INDONESIA &#127470;&#127465;</p>
+    </div>
+    <footer class="title-footer">NXRLEGENDS v1.0 — CHASE THE PERFECT 38-0 SEASON</footer>
+  </section>
+
+  <!-- ============ TEAM SELECT ============ -->
+  <section id="screen-teamselect" class="screen">
+    <header class="topbar">
+      <button class="px-btn small" data-nav="title">&#9668; BACK</button>
+      <h2>SELECT YOUR CLUB</h2>
+      <span class="topbar-hint">NUSANTARA LEGENDS LEAGUE &#9679; 20 TEAMS &#9679; 38 MATCHES</span>
+    </header>
+    <div id="team-grid" class="team-grid"></div>
+  </section>
+
+  <!-- ============ SEASON HUB ============ -->
+  <section id="screen-hub" class="screen">
+    <header class="topbar">
+      <button class="px-btn small" id="btn-quit-season">&#9668; QUIT</button>
+      <h2 id="hub-title">SEASON</h2>
+      <div id="hub-record" class="hub-record"></div>
+    </header>
+    <nav class="hub-tabs">
+      <button class="px-tab active" data-tab="next">NEXT MATCH</button>
+      <button class="px-tab" data-tab="table">TABLE</button>
+      <button class="px-tab" data-tab="fixtures">FIXTURES</button>
+      <button class="px-tab" data-tab="squad">SQUAD</button>
+    </nav>
+    <div id="hub-panel-next" class="hub-panel active"></div>
+    <div id="hub-panel-table" class="hub-panel"></div>
+    <div id="hub-panel-fixtures" class="hub-panel"></div>
+    <div id="hub-panel-squad" class="hub-panel"></div>
+  </section>
+
+  <!-- ============ MATCH ============ -->
+  <section id="screen-match" class="screen">
+    <div class="match-wrap">
+      <div id="scoreboard" class="scoreboard">
+        <div class="sb-team" id="sb-home"></div>
+        <div class="sb-score"><span id="sb-score-h">0</span><span class="sb-dash">-</span><span id="sb-score-a">0</span>
+          <div class="sb-clock" id="sb-clock">00'</div>
+        </div>
+        <div class="sb-team" id="sb-away"></div>
+      </div>
+      <canvas id="pitch" width="480" height="300"></canvas>
+      <div class="match-controls">
+        <button class="px-btn small" id="btn-speed">SPEED x1</button>
+        <button class="px-btn small gold" id="btn-skip">SKIP &#9658;&#9658;</button>
+      </div>
+      <div id="commentary" class="commentary"></div>
+    </div>
+  </section>
+
+  <!-- ============ MATCH RESULT ============ -->
+  <section id="screen-result" class="screen">
+    <div class="result-wrap">
+      <h2 id="result-headline" class="result-headline">FULL TIME</h2>
+      <div id="result-score" class="result-score"></div>
+      <div id="result-scorers" class="result-scorers"></div>
+      <div id="result-streak" class="result-streak"></div>
+      <button class="px-btn big gold" id="btn-continue">CONTINUE &#9658;</button>
+    </div>
+  </section>
+
+  <!-- ============ CUSTOM LEAGUE BUILDER ============ -->
+  <section id="screen-customleague" class="screen">
+    <header class="topbar">
+      <button class="px-btn small" data-nav="title">&#9668; BACK</button>
+      <h2>CUSTOM LEAGUE BUILDER</h2>
+      <span class="topbar-hint">PICK 4-20 TEAMS &#9679; NAME IT &#9679; RULE IT</span>
+    </header>
+    <div class="builder">
+      <div class="builder-row">
+        <label class="px-label" for="cl-name">LEAGUE NAME</label>
+        <input id="cl-name" class="px-input" maxlength="28" placeholder="MY LEGENDS LEAGUE" value="NXR SUPER LEAGUE">
+      </div>
+      <div class="builder-row">
+        <label class="px-label">FORMAT</label>
+        <div class="seg">
+          <button class="px-tab active" id="cl-double" data-rounds="2">HOME &amp; AWAY</button>
+          <button class="px-tab" id="cl-single" data-rounds="1">SINGLE ROUND</button>
+        </div>
+        <label class="px-label">YOUR TEAM &#8594; tap a selected card marked &#9733;</label>
+      </div>
+      <div class="builder-row">
+        <span class="px-label">TEAMS (<span id="cl-count">0</span> SELECTED)</span>
+        <div class="seg">
+          <button class="px-btn small" id="cl-pick-national">+ NATIONS</button>
+          <button class="px-btn small" id="cl-pick-liga1">+ LIGA 1</button>
+          <button class="px-btn small" id="cl-clear">CLEAR</button>
+        </div>
+      </div>
+      <div id="cl-grid" class="team-grid compact"></div>
+      <div class="builder-actions">
+        <button class="px-btn big gold" id="cl-start">KICK OFF &#9658;</button>
+        <p id="cl-error" class="cl-error"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ DATABASE ============ -->
+  <section id="screen-database" class="screen">
+    <header class="topbar">
+      <button class="px-btn small" data-nav="title">&#9668; BACK</button>
+      <h2>PLAYER DATABASE</h2>
+      <span class="topbar-hint">FULL TIMNAS INDONESIA SQUAD INSIDE</span>
+    </header>
+    <div class="db-layout">
+      <div id="db-teams" class="db-teams"></div>
+      <div id="db-squad" class="db-squad"></div>
+    </div>
+  </section>
+
+  <!-- ============ LEGEND (NXRSKYAA) ============ -->
+  <section id="screen-legend" class="screen">
+    <header class="topbar">
+      <button class="px-btn small" data-nav="title">&#9668; BACK</button>
+      <h2>THE LEGEND</h2>
+      <span class="topbar-hint">ONE OF A KIND</span>
+    </header>
+    <div id="legend-stage" class="legend-stage"></div>
+  </section>
+
+</div>
+<script src="js/data.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/pitch.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>
