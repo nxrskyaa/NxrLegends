@@ -1,5 +1,5 @@
 /* ============================================================
-   NxrLegends — UI, screens, season flow
+   NxrLegends — UI, screens, season flow, squad & gacha
    ============================================================ */
 
 const $ = sel => document.querySelector(sel);
@@ -22,8 +22,10 @@ const SFX = (() => {
   return {
     click: () => beep(660, 0.06),
     nav:   () => beep(440, 0.08),
+    coin:  () => { beep(880, 0.07); setTimeout(() => beep(1320, 0.1), 70); },
     goal:  () => { beep(523, 0.12); setTimeout(() => beep(659, 0.12), 110); setTimeout(() => beep(784, 0.25), 220); },
     whistle: () => beep(2200, 0.3, 'sawtooth', 0.03),
+    reveal: (i) => beep(500 + i * 120, 0.09),
     legend: () => { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => beep(f, 0.14), i * 90)); }
   };
 })();
@@ -37,7 +39,9 @@ function show(id) {
 $$('[data-nav]').forEach(b => b.addEventListener('click', () => { SFX.nav(); navTo(b.dataset.nav); }));
 
 function navTo(id) {
-  if (id === 'teamselect') renderTeamSelect();
+  if (id === 'hubentry') { enterSeason(); return; }
+  if (id === 'squad') renderSquadScreen();
+  if (id === 'store') renderStore();
   if (id === 'customleague') renderBuilder();
   if (id === 'database') renderDatabase();
   if (id === 'legend') renderLegend();
@@ -45,7 +49,7 @@ function navTo(id) {
 }
 
 /* ---------------- season state ---------------- */
-const SAVE_KEY = 'nxrlegends-season-v1';
+const SAVE_KEY = 'nxrlegends-season-v2';
 let SEASON = null;
 
 function newSeason(userTeamId, teamIds, rounds, leagueName) {
@@ -53,19 +57,29 @@ function newSeason(userTeamId, teamIds, rounds, leagueName) {
     leagueName,
     user: userTeamId,
     teams: teamIds,
-    fixtures: makeFixtures(teamIds, rounds),
-    unbeaten: true,
-    streak: 0
+    fixtures: makeFixtures(teamIds, rounds)
   };
   saveSeason();
 }
 function saveSeason() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(SEASON)); } catch (e) {} }
 function loadSeason() { try { const s = localStorage.getItem(SAVE_KEY); if (s) SEASON = JSON.parse(s); } catch (e) {} }
+function clearSeason() { SEASON = null; try { localStorage.removeItem(SAVE_KEY); } catch (e) {} }
 
 function userMatches() { return SEASON.fixtures.filter(f => f.home === SEASON.user || f.away === SEASON.user); }
 function nextUserMatch() { return userMatches().find(f => !f.played); }
 
-/* ---------------- team select ---------------- */
+/* SEASON button: resume an unfinished season, else start the 38-0 challenge
+   (your club + all 19 English league clubs, home & away = 38 matches) */
+function enterSeason() {
+  if (!SEASON || !nextUserMatch()) {
+    if (SEASON && !nextUserMatch()) clearSeason();
+    newSeason(USER_TEAM_ID, [USER_TEAM_ID, ...EPL_IDS], 2, 'THE 38-0 CHALLENGE');
+  }
+  renderHub();
+  show('hub');
+}
+
+/* ---------------- shared cards ---------------- */
 function teamCard(team, opts) {
   const div = document.createElement('div');
   div.className = 'team-card';
@@ -86,22 +100,220 @@ function teamCard(team, opts) {
   return div;
 }
 
-function renderTeamSelect() {
-  const grid = $('#team-grid');
+function playerCardEl(p, team, opts) {
+  const div = document.createElement('div');
+  div.className = 'player-card r-' + rarityOf(p) + (p.legend ? ' legend-card' : '');
+  const cv = document.createElement('canvas');
+  drawFace(cv, p, team ? team.colors : ['#e63946', '#fff'], 44);
+  div.innerHTML = `
+    <div class="pc-ovr">${p.ovr}</div>
+    <div class="pc-top"></div>
+    <div class="pc-stats">
+      <div>PAC<b>${p.stats.PAC}</b></div><div>SHO<b>${p.stats.SHO}</b></div><div>PAS<b>${p.stats.PAS}</b></div>
+      <div>DRI<b>${p.stats.DRI}</b></div><div>DEF<b>${p.stats.DEF}</b></div><div>PHY<b>${p.stats.PHY}</b></div>
+    </div>`;
+  const top = div.querySelector('.pc-top');
+  top.appendChild(cv);
+  const sub = p.legend ? 'THE LEGEND' : (team ? team.short : '');
+  top.insertAdjacentHTML('beforeend', `<div><div class="pc-name">${p.name}</div><div class="pc-pos">${p.pos} — ${sub}</div></div>`);
+  if (opts && opts.sellable) {
+    const inXI = COLL.xi.includes(p.pid);
+    if (inXI) {
+      div.insertAdjacentHTML('beforeend', '<div class="pc-xi-tag">★ IN STARTING XI</div>');
+    } else {
+      const act = document.createElement('div');
+      act.className = 'pc-actions';
+      const sell = document.createElement('button');
+      sell.className = 'px-btn small';
+      sell.textContent = `SELL +${sellValue(p)}`;
+      sell.addEventListener('click', () => {
+        SFX.coin();
+        sellPlayer(p.pid);
+        renderSquadScreen();
+      });
+      act.appendChild(sell);
+      div.appendChild(act);
+    }
+  }
+  return div;
+}
+
+/* ============================================================
+   MY SQUAD
+   ============================================================ */
+let COLL_FILTER = 'ALL';
+let CHOOSER_SLOT = null;
+
+function renderSquadScreen() {
+  $('#squad-coins').textContent = COLL.coins.toLocaleString('en-US');
+  $('#club-name').value = COLL.club;
+  $('#squad-ovr').textContent = squadOVR();
+
+  // formation buttons
+  const seg = $('#formation-seg');
+  seg.innerHTML = '';
+  Object.keys(FORMATIONS).forEach(f => {
+    const b = document.createElement('button');
+    b.className = 'px-tab' + (COLL.formation === f ? ' active' : '');
+    b.textContent = f;
+    b.addEventListener('click', () => { SFX.click(); setFormation(f); renderSquadScreen(); });
+    seg.appendChild(b);
+  });
+
+  // pitch slots
+  const pitch = $('#squad-pitch');
+  pitch.innerHTML = '';
+  const form = FORMATIONS[COLL.formation];
+  const xi = resolvedXI();
+  form.slots.forEach((pos, i) => {
+    const p = xi[i];
+    const empty = !COLL.xi[i];
+    const slot = document.createElement('button');
+    slot.className = 'slot' + (empty ? ' empty' : '') + (p.legend ? ' legend-slot' : '');
+    slot.style.left = form.xy[i][0] + '%';
+    slot.style.top = form.xy[i][1] + '%';
+    if (!empty) {
+      const cv = document.createElement('canvas');
+      drawFace(cv, p, COLL.colors, 28);
+      slot.appendChild(cv);
+    }
+    slot.insertAdjacentHTML('beforeend',
+      `<span class="slot-pos">${pos}</span>${empty ? 'TAP TO SET' : `${shortName(p.name)}<br><span class="slot-ovr">${p.ovr}</span>`}`);
+    slot.addEventListener('click', () => openChooser(i, pos));
+    pitch.appendChild(slot);
+  });
+
+  // collection
+  const owned = ownedPlayers().sort((a, b) => b.ovr - a.ovr)
+    .filter(p => COLL_FILTER === 'ALL' || p.pos === COLL_FILTER);
+  $('#coll-count').textContent = COLL.owned.length;
+  const grid = $('#coll-grid');
   grid.innerHTML = '';
-  DB.forEach(team => {
-    const card = teamCard(team);
-    card.addEventListener('click', () => {
+  owned.forEach(p => grid.appendChild(playerCardEl(p, PLAYER_INDEX[p.pid].team, { sellable: true })));
+}
+
+function shortName(n) {
+  const parts = n.split(' ');
+  return parts.length > 1 ? parts[parts.length - 1].slice(0, 9) : n.slice(0, 9);
+}
+
+$('#club-name').addEventListener('change', () => {
+  COLL.club = ($('#club-name').value.trim() || 'NXR FC').toUpperCase();
+  saveCollection();
+});
+
+$('#btn-auto-xi').addEventListener('click', () => {
+  SFX.click();
+  autoBestXI();
+  saveCollection();
+  renderSquadScreen();
+});
+
+$$('#coll-filter .px-tab').forEach(t => t.addEventListener('click', () => {
+  SFX.click();
+  COLL_FILTER = t.dataset.pos;
+  $$('#coll-filter .px-tab').forEach(x => x.classList.toggle('active', x === t));
+  renderSquadScreen();
+}));
+
+function openChooser(slotIdx, pos) {
+  SFX.click();
+  CHOOSER_SLOT = slotIdx;
+  $('#chooser-title').textContent = `PICK ${pos} FOR SLOT ${slotIdx + 1}`;
+  const list = $('#chooser-list');
+  list.innerHTML = '';
+  const candidates = ownedPlayers().filter(p => p.pos === pos).sort((a, b) => b.ovr - a.ovr);
+  if (!candidates.length) list.innerHTML = '<p class="px-label">NO PLAYERS FOR THIS POSITION — HIT THE GACHA STORE!</p>';
+  candidates.forEach(p => {
+    const row = document.createElement('button');
+    row.className = 'chooser-row';
+    const cv = document.createElement('canvas');
+    drawFace(cv, p, COLL.colors, 26);
+    row.appendChild(cv);
+    const inXI = COLL.xi.includes(p.pid);
+    row.insertAdjacentHTML('beforeend',
+      `<span>${p.name}${p.legend ? ' ★' : ''}${inXI ? ' <span style="color:var(--cyan)">(XI)</span>' : ''}</span><span class="cr-ovr">${p.ovr}</span>`);
+    row.addEventListener('click', () => {
       SFX.click();
-      newSeason(team.id, DB.map(t => t.id), 2, 'NUSANTARA LEGENDS LEAGUE');
-      renderHub();
-      show('hub');
+      assignSlot(CHOOSER_SLOT, p.pid);
+      closeChooser();
+      renderSquadScreen();
+    });
+    list.appendChild(row);
+  });
+  $('#slot-chooser').classList.remove('hidden');
+}
+function closeChooser() { $('#slot-chooser').classList.add('hidden'); }
+$('#chooser-close').addEventListener('click', closeChooser);
+$('#chooser-clear').addEventListener('click', () => {
+  assignSlot(CHOOSER_SLOT, null);
+  closeChooser();
+  renderSquadScreen();
+});
+
+/* ============================================================
+   GACHA STORE
+   ============================================================ */
+function renderStore() {
+  $('#store-coins').textContent = COLL.coins.toLocaleString('en-US');
+  const grid = $('#pack-grid');
+  grid.innerHTML = '';
+  Object.entries(PACKS).forEach(([key, pack]) => {
+    const card = document.createElement('button');
+    card.className = 'pack-card';
+    card.disabled = COLL.coins < pack.cost;
+    card.innerHTML = `
+      <div class="pack-art" style="background:${pack.color}"></div>
+      <div class="pack-name">${pack.name}</div>
+      <div class="pack-desc">${pack.desc}</div>
+      <div class="pack-cost">◉ ${pack.cost.toLocaleString('en-US')}</div>`;
+    card.addEventListener('click', () => {
+      card.classList.add('shake');
+      SFX.coin();
+      setTimeout(() => {
+        card.classList.remove('shake');
+        const pulls = openPack(key);
+        if (pulls) showReveal(pack, pulls);
+      }, 550);
     });
     grid.appendChild(card);
   });
 }
 
-/* ---------------- hub ---------------- */
+function showReveal(pack, pulls) {
+  $('#reveal-title').textContent = pack.name + ' OPENED!';
+  const box = $('#reveal-cards');
+  box.innerHTML = '';
+  pulls.forEach((pull, i) => {
+    const p = pull.player;
+    const r = rarityOf(p);
+    const card = document.createElement('div');
+    card.className = 'reveal-card r-' + r;
+    const cv = document.createElement('canvas');
+    drawFace(cv, p, PLAYER_INDEX[p.pid].team.colors, 56);
+    card.appendChild(cv);
+    card.insertAdjacentHTML('beforeend', `
+      <div class="rv-name">${p.name}</div>
+      <div class="rv-ovr">${p.ovr}</div>
+      <div class="rv-pos">${p.pos} · ${r.toUpperCase()}${p.legend ? ' ★' : ''}</div>
+      <div class="rv-tag ${pull.dupe ? '' : 'rv-new'}">${pull.dupe ? 'DUPLICATE +' + pull.refund + ' ◉' : 'NEW!'}</div>`);
+    box.appendChild(card);
+    setTimeout(() => {
+      card.classList.add('flip');
+      if (p.legend) SFX.legend(); else SFX.reveal(i);
+    }, 350 + i * 420);
+  });
+  $('#pack-reveal').classList.remove('hidden');
+}
+$('#reveal-done').addEventListener('click', () => {
+  SFX.nav();
+  $('#pack-reveal').classList.add('hidden');
+  renderStore();
+});
+
+/* ============================================================
+   SEASON HUB
+   ============================================================ */
 $$('.px-tab[data-tab]').forEach(t => t.addEventListener('click', () => {
   SFX.click();
   $$('.px-tab[data-tab]').forEach(x => x.classList.remove('active'));
@@ -110,9 +322,12 @@ $$('.px-tab[data-tab]').forEach(t => t.addEventListener('click', () => {
   $('#hub-panel-' + t.dataset.tab).classList.add('active');
 }));
 
-$('#btn-quit-season').addEventListener('click', () => {
-  SFX.nav();
-  show('title');
+$('#btn-abandon').addEventListener('click', () => {
+  if (confirm('ABANDON THIS SEASON? Progress will be lost.')) {
+    SFX.nav();
+    clearSeason();
+    show('title');
+  }
 });
 
 function resetHubTabs() {
@@ -120,16 +335,20 @@ function resetHubTabs() {
   $$('.hub-panel').forEach(p => p.classList.toggle('active', p.id === 'hub-panel-next'));
 }
 
+function userRecord() {
+  const played = userMatches().filter(f => f.played);
+  const w = played.filter(f => (f.home === SEASON.user ? f.hg > f.ag : f.ag > f.hg)).length;
+  const d = played.filter(f => f.hg === f.ag).length;
+  return { played: played.length, w, d, l: played.length - w - d };
+}
+
 function renderHub() {
   resetHubTabs();
   const user = getTeam(SEASON.user);
   $('#hub-title').textContent = SEASON.leagueName;
   const um = userMatches();
-  const played = um.filter(f => f.played);
-  const w = played.filter(f => (f.home === SEASON.user ? f.hg > f.ag : f.ag > f.hg)).length;
-  const d = played.filter(f => f.hg === f.ag).length;
-  const l = played.length - w - d;
-  $('#hub-record').innerHTML = `${user.name}<br>${w}W ${d}D ${l}L — ${played.length}/${um.length}`;
+  const r = userRecord();
+  $('#hub-record').innerHTML = `${user.name}<br>${r.w}W ${r.d}D ${r.l}L — ${r.played}/${um.length}`;
   renderNextPanel();
   renderTablePanel();
   renderFixturesPanel();
@@ -140,25 +359,21 @@ function renderNextPanel() {
   const panel = $('#hub-panel-next');
   const fx = nextUserMatch();
   const um = userMatches();
-  const played = um.filter(f => f.played);
-  const l = played.filter(f => (f.home === SEASON.user ? f.hg < f.ag : f.ag < f.hg)).length;
-  const d = played.filter(f => f.hg === f.ag).length;
-  const perfect = l === 0 && d === 0;
+  const r = userRecord();
+  const perfect = r.l === 0 && r.d === 0;
 
   if (!fx) {
     const table = computeTable(SEASON.teams, SEASON.fixtures);
-    const pos = table.findIndex(r => r.id === SEASON.user) + 1;
-    const champion = pos === 1;
-    const w = played.length - d - l;
+    const pos = table.findIndex(row => row.id === SEASON.user) + 1;
     panel.innerHTML = `
       <div class="next-match-card season-over">
-        <span class="trophy">${champion ? '🏆' : '🎖️'}</span>
+        <span class="trophy">${pos === 1 ? '🏆' : '🎖️'}</span>
         <p>SEASON COMPLETE!</p>
         <p>FINAL POSITION: ${pos}${pos === 1 ? 'ST — CHAMPIONS!' : pos === 2 ? 'ND' : pos === 3 ? 'RD' : 'TH'}</p>
-        <p>RECORD: ${w}W ${d}D ${l}L</p>
-        ${perfect && played.length >= 38 ? '<p style="color:var(--gold)">★ THE PERFECT ' + played.length + '-0 SEASON — IMMORTAL! ★</p>' :
+        <p>RECORD: ${r.w}W ${r.d}D ${r.l}L</p>
+        ${perfect && r.played >= 38 ? '<p style="color:var(--gold)">★ THE PERFECT ' + r.played + '-0 SEASON — IMMORTAL! ★</p>' :
           perfect ? '<p style="color:var(--gold)">★ UNBEATEN, UNDRAWN — PERFECT SEASON! ★</p>' :
-          l === 0 ? '<p style="color:var(--cyan)">UNBEATEN SEASON — THE INVINCIBLES!</p>' : ''}
+          r.l === 0 ? '<p style="color:var(--cyan)">UNBEATEN SEASON — THE INVINCIBLES!</p>' : ''}
         <br><button class="px-btn big gold" onclick="navTo('title')">BACK TO TITLE</button>
       </div>`;
     return;
@@ -175,8 +390,8 @@ function renderNextPanel() {
       </div>
       <div class="nm-meta">${home.name} PLAY AT HOME</div>
       <button class="px-btn big gold" id="btn-play">KICK OFF ►</button>
-      ${perfect && played.length > 2 ? `<div class="streak-banner">★ PERFECT RUN: ${played.length} WINS FROM ${played.length} — KEEP THE ${um.length}-0 DREAM ALIVE ★</div>` :
-        l === 0 && played.length > 2 ? `<div class="streak-banner">UNBEATEN IN ${played.length} — DON'T BLINK NOW</div>` : ''}
+      ${perfect && r.played > 2 ? `<div class="streak-banner">★ PERFECT RUN: ${r.played} WINS FROM ${r.played} — KEEP THE ${um.length}-0 DREAM ALIVE ★</div>` :
+        r.l === 0 && r.played > 2 ? `<div class="streak-banner">UNBEATEN IN ${r.played} — DON'T BLINK NOW</div>` : ''}
     </div>`;
   [['#nm-home', home], ['#nm-away', away]].forEach(([sel, t]) => {
     const el = $(sel);
@@ -191,12 +406,12 @@ function renderNextPanel() {
 function renderTablePanel() {
   const table = computeTable(SEASON.teams, SEASON.fixtures);
   let html = '<div class="table-scroll"><table class="px-table"><tr><th>#</th><th>TEAM</th><th class="num">P</th><th class="num">W</th><th class="num">D</th><th class="num">L</th><th class="num">GF</th><th class="num">GA</th><th class="num">GD</th><th class="num">PTS</th></tr>';
-  table.forEach((r, i) => {
-    const t = getTeam(r.id);
-    html += `<tr class="${r.id === SEASON.user ? 'user-row' : ''}">
+  table.forEach((row, i) => {
+    const t = getTeam(row.id);
+    html += `<tr class="${row.id === SEASON.user ? 'user-row' : ''}">
       <td class="pos-badge">${i + 1}</td><td>${t.name}${t.hasLegend ? ' ★' : ''}</td>
-      <td class="num">${r.P}</td><td class="num">${r.W}</td><td class="num">${r.D}</td><td class="num">${r.L}</td>
-      <td class="num">${r.GF}</td><td class="num">${r.GA}</td><td class="num">${r.GF - r.GA}</td><td class="num">${r.PTS}</td></tr>`;
+      <td class="num">${row.P}</td><td class="num">${row.W}</td><td class="num">${row.D}</td><td class="num">${row.L}</td>
+      <td class="num">${row.GF}</td><td class="num">${row.GA}</td><td class="num">${row.GF - row.GA}</td><td class="num">${row.PTS}</td></tr>`;
   });
   $('#hub-panel-table').innerHTML = html + '</table></div>';
 }
@@ -217,35 +432,23 @@ function renderFixturesPanel() {
   panel.innerHTML = html;
 }
 
-function playerCardEl(p, team) {
-  const div = document.createElement('div');
-  div.className = 'player-card' + (p.legend ? ' legend-card' : '');
-  const cv = document.createElement('canvas');
-  drawFace(cv, p, team.colors, 44);
-  div.innerHTML = `
-    <div class="pc-ovr">${p.ovr}</div>
-    <div class="pc-top"></div>
-    <div class="pc-stats">
-      <div>PAC<b>${p.stats.PAC}</b></div><div>SHO<b>${p.stats.SHO}</b></div><div>PAS<b>${p.stats.PAS}</b></div>
-      <div>DRI<b>${p.stats.DRI}</b></div><div>DEF<b>${p.stats.DEF}</b></div><div>PHY<b>${p.stats.PHY}</b></div>
-    </div>`;
-  const top = div.querySelector('.pc-top');
-  top.appendChild(cv);
-  top.insertAdjacentHTML('beforeend', `<div><div class="pc-name">${p.name}</div><div class="pc-pos">${p.pos}${p.legend ? ' — THE LEGEND' : ''}</div></div>`);
-  return div;
-}
-
 function renderSquadPanel() {
   const panel = $('#hub-panel-squad');
   panel.innerHTML = '';
   const team = getTeam(SEASON.user);
+  if (team.id === USER_TEAM_ID) {
+    panel.insertAdjacentHTML('beforeend',
+      '<p class="px-label" style="margin-bottom:12px">YOUR STARTING XI — EDIT IT IN MY SQUAD (CHANGES APPLY NEXT KICK-OFF)</p>');
+  }
   const grid = document.createElement('div');
   grid.className = 'squad-grid';
-  team.squadFull.forEach(p => grid.appendChild(playerCardEl(p, team)));
+  team.squadFull.forEach(p => grid.appendChild(playerCardEl(p, team.id === USER_TEAM_ID ? null : team)));
   panel.appendChild(grid);
 }
 
-/* ---------------- match playback ---------------- */
+/* ============================================================
+   MATCH PLAYBACK
+   ============================================================ */
 let MATCH = null;
 
 function startMatch(fixture) {
@@ -257,7 +460,6 @@ function startMatch(fixture) {
     speed: 1, timer: null,
     scene: new MatchScene($('#pitch'), home, away)
   };
-  // scoreboard
   [['#sb-home', home], ['#sb-away', away]].forEach(([sel, t]) => {
     const el = $(sel); el.innerHTML = '';
     const cv = document.createElement('canvas');
@@ -278,14 +480,12 @@ function runMatchLoop() {
   cancelAnimationFrame(MATCH.raf);
   clearInterval(MATCH.timer);
   const msPerMin = () => MATCH.speed === 1 ? 420 : 140;
-
   function animate() {
     MATCH.scene.tick();
     MATCH.scene.render();
     MATCH.raf = requestAnimationFrame(animate);
   }
   animate();
-
   MATCH.timer = setInterval(() => stepMinute(), msPerMin());
 }
 
@@ -293,14 +493,11 @@ function stepMinute() {
   const M = MATCH;
   M.minute++;
   $('#sb-clock').textContent = String(M.minute).padStart(2, '0') + "'";
-  // fire events for this minute
   while (M.evIdx < M.sim.events.length && M.sim.events[M.evIdx].min <= M.minute) {
-    const ev = M.sim.events[M.evIdx++];
-    applyEvent(ev, true);
+    applyEvent(M.sim.events[M.evIdx++], true);
   }
   if (M.minute >= 90) finishMatch();
   else if (M.minute % 15 === 0) {
-    // occasional flavour line
     logLine(pick([
       'The pixel crowd starts a wave...',
       'Tactical shouting from the dugout.',
@@ -357,11 +554,9 @@ function finishMatch() {
   clearInterval(M.timer);
   cancelAnimationFrame(M.raf);
   SFX.whistle();
-  // commit result
   M.fixture.played = true;
   M.fixture.hg = M.sim.hg;
   M.fixture.ag = M.sim.ag;
-  // sim the rest of the matchday in background
   SEASON.fixtures.filter(f => !f.played && f.md === M.fixture.md &&
     f.home !== SEASON.user && f.away !== SEASON.user).forEach(f => {
       const s = simulateMatch(getTeam(f.home), getTeam(f.away));
@@ -375,6 +570,7 @@ function finishMatch() {
 function renderResult() {
   const M = MATCH;
   const isUserHome = M.fixture.home === SEASON.user;
+  const userInMatch = isUserHome || M.fixture.away === SEASON.user;
   const ug = isUserHome ? M.sim.hg : M.sim.ag;
   const og = isUserHome ? M.sim.ag : M.sim.hg;
   const won = ug > og, drew = ug === og;
@@ -387,14 +583,21 @@ function renderResult() {
     .map(e => `${e.min}' ${e.player.name} (${e.side === 'home' ? M.home.short : M.away.short})${e.player.legend ? ' ★' : ''}`);
   $('#result-scorers').innerHTML = scorers.length ? scorers.join('<br>') : 'NO GOALS — A DEFENSIVE MASTERCLASS?';
 
+  // coin reward for the user's match
+  let coinMsg = '';
+  if (userInMatch) {
+    const earned = matchReward(won, drew, ug);
+    coinMsg = `+${earned} ◉ EARNED — BALANCE ${COLL.coins.toLocaleString('en-US')} ◉`;
+    SFX.coin();
+  }
+  $('#result-coins').textContent = coinMsg;
+
   const um = userMatches();
-  const played = um.filter(f => f.played);
-  const losses = played.filter(f => (f.home === SEASON.user ? f.hg < f.ag : f.ag < f.hg)).length;
-  const draws = played.filter(f => f.hg === f.ag).length;
+  const r = userRecord();
   let streakMsg = '';
-  if (losses === 0 && draws === 0) streakMsg = `★ PERFECT: ${played.length} WINS / ${played.length} GAMES — ${um.length - played.length} TO GO FOR ${um.length}-0 ★`;
-  else if (losses === 0) streakMsg = `UNBEATEN IN ${played.length} — INVINCIBLE VIBES`;
-  else streakMsg = `RECORD: ${played.length - draws - losses}W ${draws}D ${losses}L`;
+  if (r.l === 0 && r.d === 0) streakMsg = `★ PERFECT: ${r.played} WINS / ${r.played} GAMES — ${um.length - r.played} TO GO FOR ${um.length}-0 ★`;
+  else if (r.l === 0) streakMsg = `UNBEATEN IN ${r.played} — INVINCIBLE VIBES`;
+  else streakMsg = `RECORD: ${r.w}W ${r.d}D ${r.l}L`;
   $('#result-streak').textContent = streakMsg;
 }
 
@@ -404,7 +607,9 @@ $('#btn-continue').addEventListener('click', () => {
   show('hub');
 });
 
-/* ---------------- custom league builder ---------------- */
+/* ============================================================
+   CUSTOM LEAGUE BUILDER
+   ============================================================ */
 const BUILDER = { selected: [], userPick: null, rounds: 2 };
 
 function renderBuilder() {
@@ -416,7 +621,8 @@ function renderBuilder() {
   $('#cl-error').textContent = '';
   const grid = $('#cl-grid');
   grid.innerHTML = '';
-  DB.forEach(team => {
+  const pool = [getUserTeam(), ...DB];
+  pool.forEach(team => {
     const card = teamCard(team, { noStar: true });
     card.dataset.id = team.id;
     card.addEventListener('click', () => {
@@ -465,22 +671,16 @@ function refreshBuilderGrid() {
   });
 });
 
-$('#cl-pick-national').addEventListener('click', () => {
-  SFX.click();
-  DB.filter(t => t.type === 'nation').forEach(t => {
+function bulkPick(filter, defaultUser) {
+  DB.filter(filter).forEach(t => {
     if (!BUILDER.selected.includes(t.id)) BUILDER.selected.push(t.id);
   });
-  if (!BUILDER.userPick) BUILDER.userPick = 'idn';
+  if (!BUILDER.userPick) BUILDER.userPick = defaultUser || BUILDER.selected[0];
   refreshBuilderGrid();
-});
-$('#cl-pick-liga1').addEventListener('click', () => {
-  SFX.click();
-  DB.filter(t => t.type === 'club').forEach(t => {
-    if (!BUILDER.selected.includes(t.id)) BUILDER.selected.push(t.id);
-  });
-  if (!BUILDER.userPick) BUILDER.userPick = BUILDER.selected[0];
-  refreshBuilderGrid();
-});
+}
+$('#cl-pick-epl').addEventListener('click', () => { SFX.click(); bulkPick(t => t.type === 'epl'); });
+$('#cl-pick-national').addEventListener('click', () => { SFX.click(); bulkPick(t => t.type === 'nation', 'idn'); });
+$('#cl-pick-liga1').addEventListener('click', () => { SFX.click(); bulkPick(t => t.type === 'club'); });
 $('#cl-clear').addEventListener('click', () => {
   SFX.click();
   BUILDER.selected = [];
@@ -498,7 +698,9 @@ $('#cl-start').addEventListener('click', () => {
   show('hub');
 });
 
-/* ---------------- database ---------------- */
+/* ============================================================
+   DATABASE
+   ============================================================ */
 function renderDatabase() {
   const list = $('#db-teams');
   list.innerHTML = '';
@@ -529,10 +731,13 @@ function renderDbSquad(team) {
   box.appendChild(grid);
 }
 
-/* ---------------- legend page ---------------- */
+/* ============================================================
+   LEGEND PAGE
+   ============================================================ */
 function renderLegend() {
   const stage = $('#legend-stage');
   stage.innerHTML = '';
+  const owned = COLL.owned.includes('idn:0');
   const card = document.createElement('div');
   card.className = 'legend-big-card';
   const cv = document.createElement('canvas');
@@ -541,16 +746,19 @@ function renderLegend() {
   card.insertAdjacentHTML('beforeend', `
     <h3>${NXRSKYAA.name}</h3>
     <div class="lg-ovr">99 OVR</div>
-    <div class="lg-pos">FW — TIMNAS INDONESIA ★</div>
+    <div class="lg-pos">FW — TIMNAS INDONESIA ★${owned ? ' · IN YOUR COLLECTION!' : ''}</div>
     <div class="legend-stats">
       ${Object.entries(NXRSKYAA.stats).map(([k, v]) => `<div>${k}<b>${v}</b></div>`).join('')}
     </div>`);
   stage.appendChild(card);
   stage.insertAdjacentHTML('beforeend', `<p class="legend-lore">${NXRSKYAA.lore}</p>
-    <button class="px-btn big gold" onclick="navTo('teamselect')">PLAY AS INDONESIA ►</button>`);
+    ${owned
+      ? '<button class="px-btn big gold" onclick="navTo(\'squad\')">PUT HIM IN YOUR XI ►</button>'
+      : '<button class="px-btn big gold" onclick="navTo(\'store\')">PULL HIM IN THE GACHA ►</button>'}`);
   SFX.legend();
 }
 
 /* ---------------- boot ---------------- */
 startTitlePitch();
+loadCollection();
 loadSeason();

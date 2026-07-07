@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NxrLegends — Pixel Football Legends</title>
-<meta name="description" content="NxrLegends: retro pixel-art top-down football manager. Take the Indonesia national team (or anyone) through a perfect 38-0 season, build custom leagues, and unleash the 99-rated legend Nxrskyaa.">
+<meta name="description" content="NxrLegends: retro pixel-art top-down football game. Open gacha packs, build your ultimate squad, take on the English league in a perfect 38-0 season, and chase the 99-rated legend Nxrskyaa.">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,40 +17,87 @@
 
   <!-- ============ TITLE SCREEN ============ -->
   <section id="screen-title" class="screen active">
-    <div class="title-sky">
-      <div class="px-clouds"></div>
-      <div class="title-stadium">
-        <canvas id="title-pitch" width="320" height="180"></canvas>
-      </div>
+    <div class="title-stadium">
+      <canvas id="title-pitch" width="320" height="180"></canvas>
     </div>
     <div class="title-center">
       <h1 class="game-logo">Nxr<span>Legends</span></h1>
-      <p class="tagline">PIXEL FOOTBALL &#9679; TOP-DOWN GLORY</p>
+      <p class="tagline">PIXEL FOOTBALL &#9679; GACHA SQUADS &#9679; 38-0 GLORY</p>
       <div class="title-menu">
-        <button class="px-btn big gold" data-nav="teamselect">&#9658; SEASON MODE</button>
+        <button class="px-btn big gold" data-nav="hubentry">&#9658; SEASON — 38-0 CHALLENGE</button>
+        <button class="px-btn big" data-nav="squad">&#9873; MY SQUAD</button>
+        <button class="px-btn big" data-nav="store">&#9830; GACHA STORE</button>
         <button class="px-btn big" data-nav="customleague">&#9733; CUSTOM LEAGUE</button>
         <button class="px-btn big" data-nav="database">&#9632; DATABASE</button>
         <button class="px-btn big" data-nav="legend">&#9670; THE LEGEND</button>
       </div>
-      <p class="blink press-start">FEATURING TIMNAS INDONESIA &#127470;&#127465;</p>
+      <p class="blink press-start">FEATURING TIMNAS INDONESIA &#127470;&#127465; &amp; THE ENGLISH LEAGUE</p>
     </div>
-    <footer class="title-footer">NXRLEGENDS v1.0 — CHASE THE PERFECT 38-0 SEASON</footer>
+    <footer class="title-footer">NXRLEGENDS v2.0 — BUILD YOUR SQUAD. GO 38-0. BECOME A LEGEND.</footer>
   </section>
 
-  <!-- ============ TEAM SELECT ============ -->
-  <section id="screen-teamselect" class="screen">
+  <!-- ============ MY SQUAD ============ -->
+  <section id="screen-squad" class="screen">
     <header class="topbar">
       <button class="px-btn small" data-nav="title">&#9668; BACK</button>
-      <h2>SELECT YOUR CLUB</h2>
-      <span class="topbar-hint">NUSANTARA LEGENDS LEAGUE &#9679; 20 TEAMS &#9679; 38 MATCHES</span>
+      <h2>MY SQUAD</h2>
+      <div class="coins-chip" id="squad-coins"></div>
     </header>
-    <div id="team-grid" class="team-grid"></div>
+    <div class="squad-layout">
+      <div class="squad-left">
+        <div class="squad-meta">
+          <input id="club-name" class="px-input" maxlength="16" title="CLUB NAME">
+          <div class="squad-ovr">TEAM OVR <b id="squad-ovr">0</b></div>
+        </div>
+        <div class="seg" id="formation-seg"></div>
+        <div id="squad-pitch" class="squad-pitch"></div>
+        <button class="px-btn small gold" id="btn-auto-xi">&#9889; AUTO BEST XI</button>
+      </div>
+      <div class="squad-right">
+        <h3 class="panel-title">COLLECTION (<span id="coll-count">0</span>)</h3>
+        <div class="seg" id="coll-filter">
+          <button class="px-tab active" data-pos="ALL">ALL</button>
+          <button class="px-tab" data-pos="GK">GK</button>
+          <button class="px-tab" data-pos="DF">DF</button>
+          <button class="px-tab" data-pos="MF">MF</button>
+          <button class="px-tab" data-pos="FW">FW</button>
+        </div>
+        <div id="coll-grid" class="squad-grid"></div>
+      </div>
+    </div>
+    <div id="slot-chooser" class="chooser hidden">
+      <div class="chooser-box">
+        <h3 id="chooser-title" class="panel-title">PICK PLAYER</h3>
+        <div id="chooser-list" class="chooser-list"></div>
+        <div class="seg">
+          <button class="px-btn small" id="chooser-clear">EMPTY SLOT</button>
+          <button class="px-btn small" id="chooser-close">CLOSE</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ GACHA STORE ============ -->
+  <section id="screen-store" class="screen">
+    <header class="topbar">
+      <button class="px-btn small" data-nav="title">&#9668; BACK</button>
+      <h2>GACHA STORE</h2>
+      <div class="coins-chip" id="store-coins"></div>
+    </header>
+    <p class="store-hint">EARN COINS BY PLAYING MATCHES &#9679; DUPLICATES AUTO-CONVERT TO COINS &#9679; NXRSKYAA HIDES IN GOLD &amp; LEGEND PACKS</p>
+    <div id="pack-grid" class="pack-grid"></div>
+    <div id="pack-reveal" class="pack-reveal hidden">
+      <h3 id="reveal-title" class="panel-title">PACK OPENED!</h3>
+      <div id="reveal-cards" class="reveal-cards"></div>
+      <button class="px-btn big gold" id="reveal-done">COLLECT &#9658;</button>
+    </div>
   </section>
 
   <!-- ============ SEASON HUB ============ -->
   <section id="screen-hub" class="screen">
     <header class="topbar">
-      <button class="px-btn small" id="btn-quit-season">&#9668; QUIT</button>
+      <button class="px-btn small" data-nav="title">&#9668; BACK</button>
+      <button class="px-btn small" id="btn-abandon">&#10006; ABANDON</button>
       <h2 id="hub-title">SEASON</h2>
       <div id="hub-record" class="hub-record"></div>
     </header>
@@ -91,6 +138,7 @@
       <h2 id="result-headline" class="result-headline">FULL TIME</h2>
       <div id="result-score" class="result-score"></div>
       <div id="result-scorers" class="result-scorers"></div>
+      <div id="result-coins" class="result-coins"></div>
       <div id="result-streak" class="result-streak"></div>
       <button class="px-btn big gold" id="btn-continue">CONTINUE &#9658;</button>
     </div>
@@ -119,6 +167,7 @@
       <div class="builder-row">
         <span class="px-label">TEAMS (<span id="cl-count">0</span> SELECTED)</span>
         <div class="seg">
+          <button class="px-btn small" id="cl-pick-epl">+ ENGLAND</button>
           <button class="px-btn small" id="cl-pick-national">+ NATIONS</button>
           <button class="px-btn small" id="cl-pick-liga1">+ LIGA 1</button>
           <button class="px-btn small" id="cl-clear">CLEAR</button>
@@ -137,7 +186,7 @@
     <header class="topbar">
       <button class="px-btn small" data-nav="title">&#9668; BACK</button>
       <h2>PLAYER DATABASE</h2>
-      <span class="topbar-hint">FULL TIMNAS INDONESIA SQUAD INSIDE</span>
+      <span class="topbar-hint">TIMNAS INDONESIA &#9679; ENGLISH LEAGUE &#9679; ASIA &#9679; LIGA 1</span>
     </header>
     <div class="db-layout">
       <div id="db-teams" class="db-teams"></div>
@@ -157,6 +206,7 @@
 
 </div>
 <script src="js/data.js"></script>
+<script src="js/collection.js"></script>
 <script src="js/engine.js"></script>
 <script src="js/pitch.js"></script>
 <script src="js/ui.js"></script>

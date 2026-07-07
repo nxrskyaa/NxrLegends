@@ -313,6 +313,135 @@ canvas { image-rendering: pixelated; }
 .legend-stats b { display: block; color: var(--gold); font-size: 13px; margin-top: 5px; font-weight: normal; }
 .legend-lore { max-width: 560px; font-size: 9px; line-height: 2.2; color: var(--dim); }
 
+/* ---------------- coins ---------------- */
+.coins-chip {
+  margin-left: auto; font-size: 10px; color: var(--gold);
+  background: #241a00; outline: 3px solid var(--gold2); padding: 8px 12px;
+}
+.coins-chip::before { content: '◉ '; color: #ffe27a; }
+
+/* ---------------- squad builder ---------------- */
+.squad-layout { display: grid; grid-template-columns: minmax(300px, 420px) 1fr; gap: 20px; }
+.squad-left { display: flex; flex-direction: column; gap: 12px; }
+.squad-meta { display: flex; gap: 10px; align-items: center; }
+.squad-meta .px-input { max-width: 200px; }
+.squad-ovr { font-size: 9px; color: var(--dim); }
+.squad-ovr b { color: var(--gold); font-size: 13px; font-weight: normal; }
+.panel-title { font-size: 10px; color: var(--gold); margin-bottom: 10px; }
+
+.squad-pitch {
+  position: relative; width: 100%; aspect-ratio: 3 / 4;
+  background:
+    repeating-linear-gradient(0deg, var(--grass) 0 12.5%, var(--grass2) 12.5% 25%);
+  outline: var(--px) solid var(--shadow); box-shadow: 0 6px 0 var(--shadow);
+}
+.squad-pitch::before {
+  content: ''; position: absolute; inset: 8px; border: 2px solid var(--line); pointer-events: none;
+}
+.squad-pitch::after {
+  content: ''; position: absolute; left: 30%; right: 30%; top: 8px; height: 12%;
+  border: 2px solid var(--line); border-top: 0; pointer-events: none;
+}
+.slot {
+  position: absolute; transform: translate(-50%, -50%);
+  width: 64px; padding: 4px 2px; text-align: center; cursor: pointer;
+  background: rgba(5,7,15,.55); outline: 3px solid var(--shadow);
+  font-size: 7px; color: var(--ink); line-height: 1.5;
+  border: 0; font-family: inherit;
+}
+.slot:hover { outline-color: var(--gold); }
+.slot canvas { width: 28px; height: 28px; display: block; margin: 0 auto 2px; }
+.slot .slot-pos { color: var(--cyan); display: block; }
+.slot .slot-ovr { color: var(--gold); }
+.slot.empty { color: var(--dim); background: rgba(5,7,15,.35); }
+.slot.legend-slot { outline-color: var(--gold); animation: legendGlow 1.6s steps(4) infinite; }
+
+.squad-right { min-width: 0; }
+.pc-actions { margin-top: 10px; display: flex; gap: 8px; }
+.pc-actions .px-btn { font-size: 8px; padding: 7px 10px; }
+.pc-xi-tag { font-size: 7px; color: var(--cyan); margin-top: 8px; }
+
+/* rarity frames */
+.player-card.r-bronze { outline-color: #7a4a22; }
+.player-card.r-silver { outline-color: #8b96c9; }
+.player-card.r-gold   { outline-color: var(--gold2); }
+.player-card.r-hero   { outline-color: #c77dff; }
+.player-card.r-hero .pc-ovr { background: #3d1466; }
+
+/* chooser overlay */
+.chooser { position: fixed; inset: 0; z-index: 50; background: rgba(5,7,15,.85); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.chooser.hidden { display: none; }
+.chooser-box {
+  background: var(--panel); outline: var(--px) solid var(--shadow); box-shadow: 0 8px 0 var(--shadow);
+  padding: 18px; width: min(560px, 94vw); max-height: 80vh; display: flex; flex-direction: column; gap: 12px;
+}
+.chooser-list { overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.chooser-row {
+  display: flex; align-items: center; gap: 10px; font-size: 9px;
+  background: var(--bg2); outline: 3px solid var(--shadow); padding: 8px 10px;
+  cursor: pointer; border: 0; color: var(--ink); font-family: inherit; text-align: left;
+}
+.chooser-row:hover { outline-color: var(--gold); }
+.chooser-row canvas { width: 26px; height: 26px; }
+.chooser-row .cr-ovr { margin-left: auto; color: var(--gold); }
+
+/* ---------------- gacha store ---------------- */
+.store-hint { font-size: 8px; color: var(--dim); line-height: 1.9; margin-bottom: 18px; }
+.pack-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 16px; }
+.pack-card {
+  position: relative; text-align: center; padding: 22px 14px 16px; cursor: pointer;
+  background: linear-gradient(180deg, var(--panel2), var(--panel));
+  outline: var(--px) solid var(--shadow); box-shadow: 0 var(--px) 0 var(--shadow);
+  border: 0; font-family: inherit; color: var(--ink);
+}
+.pack-card:hover { transform: translateY(-3px); }
+.pack-card:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+.pack-art {
+  width: 84px; height: 104px; margin: 0 auto 14px; position: relative;
+  outline: 4px solid var(--shadow); box-shadow: inset 0 -18px 0 rgba(0,0,0,.28);
+}
+.pack-art::after {
+  content: '⚽'; position: absolute; inset: 0; display: grid; place-items: center; font-size: 30px;
+  text-shadow: 2px 2px 0 rgba(0,0,0,.4);
+}
+.pack-name { font-size: 11px; margin-bottom: 8px; }
+.pack-desc { font-size: 7px; color: var(--dim); line-height: 1.8; margin-bottom: 12px; }
+.pack-cost { font-size: 10px; color: var(--gold); }
+.pack-card.shake { animation: packShake .5s steps(8) infinite; }
+@keyframes packShake { 0%,100%{transform:rotate(0)} 25%{transform:rotate(-3deg) translateY(-2px)} 75%{transform:rotate(3deg) translateY(-2px)} }
+
+.pack-reveal { position: fixed; inset: 0; z-index: 60; background: rgba(5,7,15,.92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; padding: 16px; }
+.pack-reveal.hidden { display: none; }
+.reveal-cards { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; max-width: 900px; }
+.reveal-card {
+  width: 148px; padding: 12px 8px; text-align: center; position: relative;
+  background: linear-gradient(180deg, var(--panel2), var(--panel));
+  outline: 4px solid var(--shadow); box-shadow: 0 6px 0 var(--shadow);
+  opacity: 0; transform: translateY(24px) scale(.85);
+}
+.reveal-card.flip { animation: cardIn .4s steps(6) forwards; }
+@keyframes cardIn { to { opacity: 1; transform: translateY(0) scale(1); } }
+.reveal-card canvas { width: 56px; height: 56px; }
+.reveal-card .rv-name { font-size: 8px; line-height: 1.6; margin-top: 8px; min-height: 26px; }
+.reveal-card .rv-ovr { font-size: 14px; color: var(--gold); margin-top: 4px; }
+.reveal-card .rv-pos { font-size: 7px; color: var(--cyan); margin-top: 4px; }
+.reveal-card .rv-tag { font-size: 7px; margin-top: 8px; color: var(--dim); }
+.reveal-card .rv-new { color: #6dff8b; }
+.reveal-card.r-bronze { outline-color: #7a4a22; }
+.reveal-card.r-silver { outline-color: #8b96c9; }
+.reveal-card.r-gold { outline-color: var(--gold2); }
+.reveal-card.r-hero { outline-color: #c77dff; }
+.reveal-card.r-legend {
+  outline-color: var(--gold);
+  background: linear-gradient(180deg, #4d3b00, #1c1400);
+  animation: cardIn .4s steps(6) forwards, legendGlow 1.2s steps(4) infinite;
+}
+.result-coins { font-size: 10px; color: var(--gold); line-height: 2; }
+
+@media (max-width: 760px) {
+  .squad-layout { grid-template-columns: 1fr; }
+}
+
 /* ---------------- misc ---------------- */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: var(--bg2); }
