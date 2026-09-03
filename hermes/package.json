@@ -1,0 +1,15 @@
+{
+  "name": "hermes-agent",
+  "version": "1.0.0",
+  "description": "Hermes — on-chain NFT alpha detection agent for Robinhood Chain. Finds collections while they are still quiet.",
+  "type": "module",
+  "bin": { "hermes": "./src/index.js" },
+  "scripts": {
+    "hermes": "node src/index.js",
+    "watch": "node src/index.js watch",
+    "serve": "node src/index.js serve"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {},
+  "license": "MIT"
+}

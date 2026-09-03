@@ -44,3 +44,24 @@ js/worldcup.js    16-nation single-elimination World Cup bracket
 ```
 
 All player ratings are original game values. Built with ❤️ for the Garuda.
+
+---
+
+## Also in this repo
+
+### 📡 [`hermes/`](hermes/) — NFT alpha detection agent for Robinhood Chain
+
+A separate, self-contained Node CLI that watches Robinhood Chain for NFT
+collections that are working but not yet noticed: it folds every mint into
+rolling per-collection state, scores nine on-chain signals (smart-money
+presence, mint acceleration, organic spread, holder concentration, secondary
+demand, sybil resistance, deployer track record…), and multiplies the result by
+a *stealth* factor that decays as crowd awareness rises — so it goes quiet on a
+collection exactly as everyone else gets loud. Ships with a live dashboard, a
+lookahead-free backtester, and a mock chain for tests. Zero dependencies.
+
+```bash
+cd hermes && node src/index.js init && node src/index.js doctor
+```
+
+See [`hermes/README.md`](hermes/README.md) for the full write-up.
