@@ -11,6 +11,7 @@ export class Store {
     this.file = file;
     this.cursor = null;
     this.collections = new Map();
+    this.theses = new Map();
     this.alerts = [];
     this.meta = { createdAt: new Date().toISOString(), scans: 0 };
     this.load();
@@ -26,6 +27,7 @@ export class Store {
     this.cursor = raw.cursor ?? null;
     this.meta = raw.meta || this.meta;
     this.alerts = raw.alerts || [];
+    this.theses = new Map((raw.theses || []).map((t) => [t.address, t]));
     for (const c of raw.collections || []) this.collections.set(c.address, Collection.revive(c));
   }
 
@@ -35,6 +37,7 @@ export class Store {
       cursor: this.cursor,
       meta: { ...this.meta, savedAt: new Date().toISOString() },
       collections: [...this.collections.values()].map((c) => c.toJSON()),
+      theses: [...this.theses.values()].slice(-500),
       alerts: this.alerts.slice(-500),
     };
     const tmp = `${this.file}.tmp`;
@@ -66,6 +69,7 @@ export class Store {
   prune(nowTs, cfg) {
     let removed = 0;
     for (const [k, c] of this.collections) {
+      if (this.theses.get(k)?.status === 'open') continue; // still being managed
       if (isExpired(c, nowTs, cfg)) {
         this.collections.delete(k);
         removed++;

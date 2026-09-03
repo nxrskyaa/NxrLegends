@@ -14,6 +14,7 @@ import { TIER_WEIGHT } from './wallets.js';
 export const SIGNALS = [
   {
     id: 'smart_money',
+    layer: 'quality',
     label: 'Smart money present',
     weight: 26,
     async evaluate({ col, wallets, cfg }) {
@@ -32,22 +33,28 @@ export const SIGNALS = [
 
   {
     id: 'mint_acceleration',
+    layer: 'attention',
     label: 'Mint velocity accelerating',
     weight: 16,
     evaluate({ d, cfg }) {
       if (d.mints < (cfg.signals.minMintsForRate ?? 5)) return null;
       const speed = ramp(d.mintsPerMin, 0.2, cfg.signals.mintsPerMinMid ?? 4);
       const accel = ramp(d.accelRatio, 1, cfg.signals.accelRatioMid ?? 2.2);
+      // A big 24h number says nothing about direction. The ladder asks whether
+      // each leg of the window beat the one before it — 30 → 70 → 140.
+      const ladder = d.ladder?.score ?? 0;
+      const steps = d.ladder?.steps?.length ? d.ladder.steps.join(' → ') : 'n/a';
       return {
-        score: clamp01(0.45 * speed + 0.55 * accel),
-        note: `${d.mintsPerMin.toFixed(2)}/min, ${d.accelRatio.toFixed(2)}× baseline`,
-        evidence: [`rate=${d.mintsPerMin.toFixed(2)}/min`, `accel=${d.accelPerMin.toFixed(3)}/min²`],
+        score: clamp01(0.3 * speed + 0.35 * accel + 0.35 * ladder),
+        note: `${d.mintsPerMin.toFixed(2)}/min, ${d.accelRatio.toFixed(2)}× baseline, ladder ${steps}${d.ladder?.monotone ? ' ↑' : ''}`,
+        evidence: [`rate=${d.mintsPerMin.toFixed(2)}/min`, `ladderGrowth=${(d.ladder?.growth ?? 0).toFixed(2)}×`],
       };
     },
   },
 
   {
     id: 'organic_distribution',
+    layer: 'structure',
     label: 'Organic mint spread',
     weight: 14,
     evaluate({ d, cfg }) {
@@ -67,6 +74,7 @@ export const SIGNALS = [
 
   {
     id: 'sybil_resistance',
+    layer: 'structure',
     label: 'Not a bot farm',
     weight: 8,
     evaluate({ col, d, cfg }) {
@@ -91,6 +99,7 @@ export const SIGNALS = [
 
   {
     id: 'holder_spread',
+    layer: 'structure',
     label: 'Supply not concentrated',
     weight: 10,
     evaluate({ d }) {
@@ -107,9 +116,29 @@ export const SIGNALS = [
   },
 
   {
+    id: 'flow_absorption',
+    layer: 'flow',
+    label: 'Sellers being absorbed',
+    weight: 14,
+    evaluate({ d }) {
+      const a = d.absorb;
+      // No sell pressure yet means the question has not been asked — abstain
+      // rather than award marks for an untested market.
+      if (!a || a.score == null) return null;
+      const delta = `${a.holderDelta >= 0 ? '+' : ''}${a.holderDelta}`;
+      return {
+        score: a.score,
+        note: `${a.verdict} — ${d.uniqueBuyers} buyers vs ${d.uniqueSellers} sellers, holders ${delta}`,
+        evidence: [`buyer/seller=${a.ratio.toFixed(2)}`, `top10Δ=${(a.concentrating * 100).toFixed(1)}pt`],
+      };
+    },
+  },
+
+  {
     id: 'secondary_demand',
+    layer: 'flow',
     label: 'Early secondary demand',
-    weight: 10,
+    weight: 8,
     evaluate({ d, cfg }) {
       if (d.mints < 10) return null;
       if (d.secondary === 0) {
@@ -130,6 +159,7 @@ export const SIGNALS = [
 
   {
     id: 'supply_scarcity',
+    layer: 'structure',
     label: 'Scarce supply filling fast',
     weight: 6,
     evaluate({ d, cfg }) {
@@ -146,6 +176,7 @@ export const SIGNALS = [
 
   {
     id: 'deployer_pedigree',
+    layer: 'quality',
     label: 'Deployer has a track record',
     weight: 8,
     evaluate({ col, wallets, history }) {
@@ -166,6 +197,7 @@ export const SIGNALS = [
 
   {
     id: 'contract_health',
+    layer: 'structure',
     label: 'Contract looks legit',
     weight: 6,
     evaluate({ col, d }) {

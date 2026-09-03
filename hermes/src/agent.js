@@ -9,6 +9,7 @@ import { Wallets } from './wallets.js';
 import { MINT_FILTERS, ALL_TRANSFER_TOPICS, normalize, isErc721Transfer } from './events.js';
 import { TOPIC } from './abi.js';
 import { scoreCollection, TIER_ORDER } from './score.js';
+import { openThesis, evaluateThesis } from './thesis.js';
 import { buildAlert, dispatch, meetsTier, colors as C } from './notify.js';
 import { chunk, sleep, groupBy, nowSec } from './util.js';
 
@@ -142,7 +143,17 @@ export class Agent {
     await this.enrich(touched);
 
     const results = await this.scoreAll(touched);
-    const alerts = await this.maybeAlert(results);
+
+    // Open theses are re-tested every cycle even when the collection saw no
+    // events this range — a thesis dies of silence as readily as of bad news.
+    const managed = new Set(touched.map((c) => c.address));
+    const idle = [...this.store.theses.values()]
+      .filter((t) => t.status === 'open' && !managed.has(t.address))
+      .map((t) => this.store.collections.get(t.address))
+      .filter(Boolean);
+    const idleResults = idle.length ? await this.scoreAll(idle) : [];
+
+    const alerts = await this.manage([...results, ...idleResults], nowSec());
 
     this.store.cursor = to;
     this.store.meta.scans = (this.store.meta.scans || 0) + 1;
@@ -228,35 +239,74 @@ export class Agent {
       const result = await scoreCollection({ col, d, wallets: this.wallets, chain: this.chain, cfg: this.cfg, history });
       col.lastScore = { score: result.score, tier: result.tier, at: result.at };
       col.peakScore = Math.max(col.peakScore || 0, result.score);
+      // Trend memory: what absorption and distribution are measured against.
+      col.history.push({
+        t: nowSec(),
+        score: result.score,
+        holders: d.holders,
+        top10Share: d.top10Share,
+        ratePerMin: d.mintsPerMin + d.secondaryPerMin,
+      });
+      if (col.history.length > 48) col.history.shift();
       out.push({ col, result });
     }
     return out.sort((a, b) => b.result.score - a.result.score);
   }
 
-  /** Fires once per collection per tier upgrade, with a cooldown to stop spam. */
-  async maybeAlert(results) {
+  /**
+   * The MANAGE layer. An alert is not the end of the job: every call opens a
+   * thesis with explicit invalidation conditions, and every later cycle
+   * re-tests it. Collections leave with a reason, not by going quiet.
+   */
+  async manage(results, nowTs) {
     const minTier = this.cfg.alerts.minTier || 'SIGNAL';
-    const cooldown = (this.cfg.alerts.cooldownSec ?? 1800) * 1000;
+    const reopen = (this.cfg.thesis?.reopenCooldownSec ?? 7200) * 1000;
     const fired = [];
 
-    for (const { col, result } of results) {
-      if (!meetsTier(result.tier, minTier)) continue;
-
-      const prevRank = TIER_ORDER.indexOf(col.alertedTier || 'NOISE');
-      const rank = TIER_ORDER.indexOf(result.tier);
-      const upgraded = rank > prevRank;
-      const cooledDown = !col.alertedAt || Date.now() - col.alertedAt > cooldown;
-
-      if (col.alertedTier && !(upgraded && this.cfg.alerts.reAlertOnUpgrade) && !cooledDown) continue;
-      if (col.alertedTier && !upgraded && !cooledDown) continue;
-
-      const alert = buildAlert(col, result, this.cfg);
+    const emit = async (col, result, extra) => {
+      const alert = buildAlert(col, result, this.cfg, extra);
       if (!this.silent) await dispatch(alert, this.cfg);
-      col.alertedTier = result.tier;
-      col.alertedAt = Date.now();
       this.store.recordAlert(alert);
       fired.push(alert);
+    };
+
+    for (const { col, result } of results) {
+      const th = this.store.theses.get(col.address);
+
+      if (th && th.status === 'open') {
+        th.checks++;
+        const verdict = evaluateThesis(th, result.derived, result, nowTs, this.cfg);
+
+        if (verdict.status !== 'open') {
+          th.status = verdict.status;
+          th.closedAt = nowTs;
+          th.closeReason = verdict.reasons;
+          await emit(col, result, { kind: verdict.status === 'matured' ? 'MATURED' : 'INVALIDATED', reasons: verdict.reasons, thesis: th });
+          continue;
+        }
+
+        // Still valid, and the evidence got stronger — worth saying once.
+        const upgraded = TIER_ORDER.indexOf(result.tier) > TIER_ORDER.indexOf(th.tier);
+        if (upgraded && this.cfg.alerts.reAlertOnUpgrade) {
+          th.tier = result.tier;
+          th.size = result.size;
+          th.score = result.score;
+          await emit(col, result, { kind: 'UPGRADE', thesis: th });
+        }
+        continue;
+      }
+
+      if (!meetsTier(result.tier, minTier)) continue;
+      // Don't walk straight back into something that just invalidated.
+      if (th && th.closedAt && Date.now() - th.closedAt * 1000 < reopen) continue;
+
+      const opened = openThesis(col, result, nowTs, this.cfg);
+      this.store.theses.set(col.address, opened);
+      col.alertedTier = result.tier;
+      col.alertedAt = Date.now();
+      await emit(col, result, { kind: 'ENTRY', thesis: opened });
     }
+
     return fired;
   }
 

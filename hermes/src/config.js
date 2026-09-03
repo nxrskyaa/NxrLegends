@@ -49,6 +49,25 @@ export const DEFAULTS = {
     stealthFloor: 0.35,
     stealthPeak: 1.15,
   },
+  confluence: {
+    layerFloor: 0.55,
+    tierRequires: { URGENT: 4, ALPHA: 3, SIGNAL: 2, WATCH: 1 },
+    fullSizeConfidence: 0.8,
+  },
+  flow: {
+    deadRatePerMin: 0.15,
+    deadIdleSec: 2700,
+  },
+  thesis: {
+    rateCollapseFrac: 0.25,
+    reopenCooldownSec: 7200,
+    absoluteRateFloor: 0.1,
+    holderDrawdownFrac: 0.85,
+    distributionSlack: 0.12,
+    maxIdleSec: 5400,
+    rateGraceSec: 900,
+    matureCrowdIndex: 0.7,
+  },
   filters: {
     requireKnownStandard: true,
     minUniqueMinters: 4,

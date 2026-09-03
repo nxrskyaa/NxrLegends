@@ -55,6 +55,19 @@
   .blockers{color:var(--urgent);font-size:11px;margin:8px 0 4px}
   .kv{display:flex;flex-wrap:wrap;gap:4px 16px;color:var(--dim);font-size:11px;margin-top:10px;
       padding-top:9px;border-top:1px solid var(--line)}
+  .layers{display:flex;gap:6px;flex-wrap:wrap;margin:2px 0 9px}
+  .layers span{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;padding:2px 7px;border-radius:3px;
+    border:1px solid var(--line);color:var(--dim)}
+  .layers span.met{color:var(--alpha);border-color:var(--alpha)}
+  .layers span.miss{color:var(--watch);border-color:#3a3320}
+  .size{font-size:9px;letter-spacing:.1em;padding:2px 6px;border:1px solid currentColor;border-radius:3px}
+  .th{margin-top:10px;padding-top:9px;border-top:1px solid var(--line);font-size:11px}
+  .th .hd{display:flex;gap:8px;align-items:baseline;margin-bottom:4px}
+  .th .st{font-size:9px;letter-spacing:.1em;padding:2px 6px;border-radius:3px;border:1px solid currentColor}
+  .th .open{color:var(--alpha)}.th .matured{color:var(--signal)}.th .invalidated{color:var(--urgent)}
+  .th .prog,.th .inv{color:var(--dim);font-size:10.5px}
+  .th .inv{margin-top:3px}
+  .th .rsn{color:var(--urgent);font-size:10.5px}
   .kv b{color:var(--ink);font-weight:500}
   a{color:var(--signal);text-decoration:none}
   a:hover{text-decoration:underline}
@@ -78,13 +91,19 @@
     <div class="filters" id="filters"></div>
     <div id="list"><div class="empty">waiting for the first scan…</div></div>
   </section>
+  <div>
+  <section style="margin-bottom:14px">
+    <h2>Open theses</h2>
+    <div id="theses"><div class="empty">nothing under management</div></div>
+  </section>
   <section>
     <h2>Alert feed</h2>
     <div id="alerts"><div class="empty">no alerts yet</div></div>
   </section>
+  </div>
 </main>
 
-<footer>Score = weighted signals × stealth multiplier × confidence. A candidate is only alpha while the crowd index is still low. Auto-refresh every 10s.</footer>
+<footer>Score = weighted signals × stealth multiplier × confidence, then capped by how many of the four layers agree (attention / quality / flow / structure). A candidate is only alpha while the crowd index is still low. Auto-refresh every 10s.</footer>
 
 <script>
 const TIERS = ['URGENT','ALPHA','SIGNAL','WATCH','NOISE'];
@@ -134,11 +153,16 @@ function renderList(){
         <span class="tier t-${c.tier}">${c.tier}</span>
         <span class="score t-${c.tier}">${c.score}</span>
         <span class="nm">${esc(c.name || short(c.address))}<small>${esc(c.symbol||'')} ${short(c.address)}</small></span>
-        <span class="stats">${d.mints} mints · ${d.uniqueMinters} minters · ${d.mintsPerMin.toFixed(1)}/min · crowd ${pct(c.crowdIndex)} · ${age(d.ageSec)}</span>
+        <span class="stats">${c.size !== 'NONE' ? `<span class="size t-${c.tier}">${c.size}</span> ` : ''}${c.layersMet}/4 · ${d.mints} mints · ${d.uniqueMinters} minters · ${d.mintsPerMin.toFixed(1)}/min · ${d.absorb ? d.absorb.verdict : 'no flow'} · crowd ${pct(c.crowdIndex)} · ${age(d.ageSec)}</span>
       </summary>
       <div class="body">
         ${blockers}
+        <div class="layers">${Object.entries(c.layers).map(([k,v]) =>
+          `<span class="${v.met?'met':v.score==null?'':'miss'}">${k}${v.score==null?' ·':' '+pct(v.score)}</span>`).join('')}
+          ${c.tierCapped ? `<span class="miss">capped from ${c.tierCapped}</span>` : ''}
+        </div>
         ${sigs}
+        ${renderThesis(c.thesis)}
         <div class="kv">
           <span>holders <b>${d.holders}</b></span>
           <span>secondary <b>${d.secondary}</b></span>
@@ -153,15 +177,44 @@ function renderList(){
   }).join('');
 }
 
+function renderThesis(t){
+  if(!t) return '';
+  const inv = t.invalidation;
+  const p = t.entry;
+  return `<div class="th">
+    <div class="hd"><span class="st ${t.status}">THESIS ${t.status.toUpperCase()}</span>
+      <span style="color:var(--dim)">${t.checks} re-checks · size ${t.size}</span></div>
+    ${t.why.map(w=>`<div class="prog">↳ ${esc(w.label)}: ${esc(w.note)}</div>`).join('')}
+    <div class="prog">entry: ${p.holders} holders · ${p.ratePerMin.toFixed(2)}/min · top10 ${pct(p.top10Share)} · ${esc(p.absorb||'n/a')}</div>
+    ${t.status==='open'
+      ? `<div class="inv">invalidates if: flow &lt; ${inv.rateFloor.toFixed(2)}/min · holders &lt; ${inv.holderFloor} · top10 &gt; ${pct(inv.top10Cap)} · sellers stop being absorbed</div>`
+      : (t.closeReason||[]).map(r=>`<div class="rsn">✕ ${esc(r)}</div>`).join('')}
+  </div>`;
+}
+
+function renderTheses(){
+  const el = document.getElementById('theses');
+  const open = (state.theses||[]).filter(t => t.status === 'open');
+  if(!open.length){ el.innerHTML = '<div class="empty">nothing under management</div>'; return; }
+  el.innerHTML = open.map(t => `<div class="alert">
+      <div class="top">
+        <span class="t-${t.tier}"><b>${t.tier} ${t.score}</b> ${esc(t.name || short(t.address))}</span>
+        <span style="color:var(--dim)">${t.size} · ${t.layersMet}/4</span>
+      </div>
+      <div class="why">${t.why.map(w=>`<div>↳ ${esc(w.label)}</div>`).join('')}</div>
+      <div class="why">flow floor ${t.invalidation.rateFloor.toFixed(2)}/min · holder floor ${t.invalidation.holderFloor}</div>
+    </div>`).join('');
+}
+
 function renderAlerts(){
   const el = document.getElementById('alerts');
   if (!state.alerts.length){ el.innerHTML = '<div class="empty">no alerts yet</div>'; return; }
   el.innerHTML = state.alerts.map(a => `<div class="alert">
       <div class="top">
-        <span class="t-${a.tier}"><b>${a.tier} ${a.score}</b> ${esc(a.name)}</span>
+        <span class="t-${a.tier}"><b>${esc(a.kind||'ENTRY')}</b> · <b>${a.tier} ${a.score}</b> ${esc(a.name)}</span>
         <span style="color:var(--dim)">${new Date(a.at).toLocaleTimeString()}</span>
       </div>
-      <div class="why">${a.why.map(w => `<div>↳ ${esc(w)}</div>`).join('')}</div>
+      <div class="why">${((a.reasons&&a.reasons.length?a.reasons:a.why)||[]).map(w => `<div>↳ ${esc(w)}</div>`).join('')}</div>
     </div>`).join('');
 }
 
@@ -169,7 +222,7 @@ async function tick(){
   try{
     const r = await fetch('/api/state', {cache:'no-store'});
     state = await r.json();
-    renderMeta(); renderList(); renderAlerts();
+    renderMeta(); renderList(); renderTheses(); renderAlerts();
   }catch(e){
     document.getElementById('meta').innerHTML = '<span style="color:var(--urgent)">agent offline — is `hermes serve` running?</span>';
   }

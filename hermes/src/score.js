@@ -2,6 +2,7 @@
 
 import { SIGNALS, stealth } from './signals.js';
 import { disqualify } from './filters.js';
+import { layerScores, capTier, sizing } from './confluence.js';
 
 export const TIER_ORDER = ['NOISE', 'WATCH', 'SIGNAL', 'ALPHA', 'URGENT'];
 
@@ -31,18 +32,18 @@ export async function scoreCollection(ctx) {
       out = await sig.evaluate(ctx);
     } catch (e) {
       out = null;
-      parts.push({ id: sig.id, label: sig.label, weight, score: null, note: `error: ${e.message}`, evidence: [] });
+      parts.push({ id: sig.id, layer: sig.layer, label: sig.label, weight, score: null, note: `error: ${e.message}`, evidence: [] });
       continue;
     }
     if (out == null) {
       // No data for this signal — drop its weight rather than scoring it zero,
       // so a young collection is not punished for facts we cannot know yet.
-      parts.push({ id: sig.id, label: sig.label, weight, score: null, note: 'no data', evidence: [] });
+      parts.push({ id: sig.id, layer: sig.layer, label: sig.label, weight, score: null, note: 'no data', evidence: [] });
       continue;
     }
     weighted += weight * out.score;
     totalWeight += weight;
-    parts.push({ id: sig.id, label: sig.label, weight, score: out.score, note: out.note, evidence: out.evidence || [] });
+    parts.push({ id: sig.id, layer: sig.layer, label: sig.label, weight, score: out.score, note: out.note, evidence: out.evidence || [] });
   }
 
   const base = totalWeight > 0 ? weighted / totalWeight : 0;
@@ -54,10 +55,21 @@ export async function scoreCollection(ctx) {
   const raw = 100 * base * st.multiplier * confidence;
   const score = blockers.length ? 0 : Math.round(Math.min(100, raw) * 10) / 10;
 
+  // Confluence gate: the weighted score says how strong, the agreeing layers
+  // say how far it may be promoted. One loud signal is never enough.
+  const layers = layerScores(parts, cfg);
+  const rawTier = blockers.length ? 'NOISE' : tierOf(score, cfg);
+  const { tier, layersMet, capped } = capTier(rawTier, layers, cfg);
+
   return {
     address: col.address,
     score,
-    tier: blockers.length ? 'NOISE' : tierOf(score, cfg),
+    tier,
+    rawTier,
+    tierCapped: capped,
+    layers,
+    layersMet,
+    size: blockers.length ? 'NONE' : sizing(tier, layersMet, confidence, cfg),
     blockers,
     crowdIndex: Math.round(st.crowdIndex * 100) / 100,
     stealthMultiplier: Math.round(st.multiplier * 100) / 100,

@@ -3,6 +3,7 @@
 // that knows how raw events turn into numbers.
 
 import { gini, topShare, slope, ZERO } from './util.js';
+import { velocityLadder, absorption } from './flow.js';
 
 export class Collection {
   constructor(address, opts = {}) {
@@ -28,7 +29,8 @@ export class Collection {
     this.minters = new Map(); // addr -> { count, firstTs, firstBlock }
     this.holders = new Map(); // addr -> balance
     this.mintTxs = new Map(); // txHash -> { to, count, block }
-    this.buckets = []; // { t0, mints, secondary, newMinters }
+    this.buckets = []; // see _bucket() for the shape
+    this.history = []; // score-time snapshots, used for trend + thesis invalidation
     this.bucketSeconds = opts.bucketSeconds || 300;
     this.maxBuckets = opts.maxBuckets || 36;
 
@@ -49,6 +51,7 @@ export class Collection {
       mintTxs: new Map(o.mintTxs || []),
       contractMinters: new Set(o.contractMinters || []),
       probedMinters: new Set(o.probedMinters || []),
+      history: o.history || [],
       flags: new Set(o.flags || []),
     });
     return c;
@@ -63,6 +66,7 @@ export class Collection {
       mintTxs: [...this.mintTxs].slice(-2000),
       contractMinters: [...this.contractMinters],
       probedMinters: [...this.probedMinters].slice(-2000),
+      history: this.history.slice(-48),
       flags: [...this.flags],
     };
   }
@@ -101,9 +105,17 @@ export class Collection {
       this.secondary += ev.qty;
       b.secondary += ev.qty;
       if (this.firstSecondaryTs == null) this.firstSecondaryTs = ts;
+      // Who is releasing supply, and who is taking it — the absorption question.
+      const hadBefore = (this.holders.get(ev.to) || 0) > 0;
       this._credit(ev.from, -ev.qty);
       this._credit(ev.to, ev.qty);
+      pushUniq(b.sellers, ev.from);
+      pushUniq(b.buyers, ev.to);
+      if (!hadBefore) b.newHolders += 1;
+      if (!this.holders.has(ev.from)) b.exits += 1;
     }
+
+    b.holders = this.holders.size;
   }
 
   _credit(addr, delta) {
@@ -117,7 +129,7 @@ export class Collection {
     const t0 = Math.floor((ts ?? 0) / this.bucketSeconds) * this.bucketSeconds;
     const last = this.buckets[this.buckets.length - 1];
     if (last && last.t0 === t0) return last;
-    const b = { t0, mints: 0, secondary: 0, newMinters: 0 };
+    const b = { t0, mints: 0, secondary: 0, newMinters: 0, newHolders: 0, exits: 0, holders: this.holders.size, buyers: [], sellers: [] };
     this.buckets.push(b);
     // Only the recent window matters — this is a momentum detector, not an archive.
     if (this.buckets.length > this.maxBuckets) this.buckets.splice(0, this.buckets.length - this.maxBuckets);
@@ -152,6 +164,31 @@ export class Collection {
     const counts = [...this.minters.values()].map((m) => m.count);
     const ownerBal = this.owner ? this.holders.get(this.owner) || 0 : 0;
 
+    // --- FLOW: is participation stepping up, and who absorbs the sellers? ---
+    const secondaryPerMin = recent.length ? recent.reduce((a, b) => a + b.secondary, 0) / (recent.length * bucketsPerMin) : 0;
+    const ladder = velocityLadder(this.buckets.slice(-9).map((b) => b.mints + b.secondary));
+
+    const flowWindow = this.buckets.slice(-6);
+    const buyers = new Set();
+    const sellers = new Set();
+    let sold = 0;
+    for (const b of flowWindow) {
+      for (const a of b.buyers || []) buyers.add(a);
+      for (const a of b.sellers || []) sellers.add(a);
+      sold += b.secondary || 0;
+    }
+    const holdersStart = flowWindow.length ? flowWindow[0].holders ?? this.holders.size : this.holders.size;
+    const past = this.history.length ? this.history[Math.max(0, this.history.length - flowWindow.length)] : null;
+    const absorb = absorption({
+      buyers: buyers.size,
+      sellers: sellers.size,
+      holdersStart,
+      holdersEnd: this.holders.size,
+      sold,
+      top10Start: past?.top10Share ?? null,
+      top10End: topShare(holderBalances, 10),
+    });
+
     return {
       ageSec,
       supply,
@@ -177,9 +214,20 @@ export class Collection {
       top1Share: topShare(holderBalances, 1),
       ownerShare: ownerBal / supply,
       secondaryRatio: this.mints ? this.secondary / this.mints : 0,
+      secondaryPerMin,
+      ladder,
+      absorb,
+      uniqueBuyers: buyers.size,
+      uniqueSellers: sellers.size,
       timeToFirstSecondary: this.firstSecondaryTs && this.firstTs ? this.firstSecondaryTs - this.firstTs : null,
       supplyFilled: this.maxSupply ? Number(this.maxSupply) > 0 ? supply / Number(this.maxSupply) : null : null,
       staleSec: this.lastTs ? Math.max(0, now - this.lastTs) : null,
     };
   }
+}
+
+function pushUniq(arr, addr) {
+  if (!addr || arr.includes(addr)) return;
+  arr.push(addr);
+  if (arr.length > 400) arr.shift(); // buckets are minutes wide; this is plenty
 }

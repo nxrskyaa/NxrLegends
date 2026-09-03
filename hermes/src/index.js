@@ -9,6 +9,7 @@ import { loadConfig, DEFAULTS } from './config.js';
 import { Agent } from './agent.js';
 import { backtest, renderBacktest } from './backtest.js';
 import { scoreCollection } from './score.js';
+import { thesisProgress } from './thesis.js';
 import { colors as C } from './notify.js';
 import { nowSec, shortAddr, pct, fmtAge, isAddr } from './util.js';
 
@@ -38,6 +39,7 @@ ${C.bold}Hermes${C.reset} — NFT alpha detection agent for Robinhood Chain
   hermes watch                         run continuously (the normal mode)
   hermes top [--n 20] [--tier WATCH]   ranked candidates from current state
   hermes inspect <address>             full score breakdown for one collection
+  hermes theses [--all]                open theses, their progress and what would invalidate them
   hermes wallets list                  show the smart-money registry
   hermes wallets add <addr> [--tier S|A|B] [--note "..."]
   hermes wallets remove <addr>
@@ -144,8 +146,38 @@ async function main() {
     await agent.enrich([col]);
     const d = col.derive(nowSec());
     const result = await scoreCollection({ col, d, wallets: agent.wallets, chain: agent.chain, cfg, history: agent.store.ownerHistory() });
-    printInspect(col, result, cfg);
+    printInspect(col, result, cfg, agent.store.theses.get(addr));
     agent.store.save();
+    return;
+  }
+
+  if (cmd === 'theses') {
+    const agent = new Agent(cfg);
+    const all = [...agent.store.theses.values()];
+    const rows = args.all ? all : all.filter((t) => t.status === 'open');
+    if (!rows.length) {
+      process.stdout.write(args.all ? 'no theses recorded yet\n' : 'no open theses\n');
+      return;
+    }
+    for (const t of rows.sort((a, b) => b.openedAt - a.openedAt)) {
+      const col = agent.store.collections.get(t.address);
+      const d = col ? col.derive(nowSec()) : null;
+      const mark = t.status === 'open' ? `${C.green}open${C.reset}` : t.status === 'matured' ? `${C.blue}matured${C.reset}` : `${C.red}invalidated${C.reset}`;
+      process.stdout.write(`\n${C.bold}${t.name || shortAddr(t.address)}${C.reset} ${C.dim}${t.address}${C.reset}\n`);
+      process.stdout.write(`  ${mark}  ${t.tier} ${t.score}  size ${t.size}  confluence ${t.layersMet}/4  opened ${fmtAge(nowSec() - t.openedAt)} ago  ${t.checks} re-checks\n`);
+      for (const w of t.why) process.stdout.write(`  ${C.dim}↳ ${w.label}: ${w.note}${C.reset}\n`);
+      if (d) {
+        const p = thesisProgress(t, d);
+        process.stdout.write(`  ${C.dim}holders ${p.holders}${p.holderMult ? ` (${p.holderMult.toFixed(2)}×)` : ''} · flow ${p.rate} · absorb ${p.absorb} · top10 ${p.top10}${C.reset}\n`);
+      }
+      if (t.status === 'open') {
+        const i = t.invalidation;
+        process.stdout.write(`  ${C.dim}invalidates if: flow < ${i.rateFloor.toFixed(2)}/min · holders < ${i.holderFloor} · top10 > ${pct(i.top10Cap)} · sellers stop being absorbed${C.reset}\n`);
+      } else if (t.closeReason) {
+        for (const r of t.closeReason) process.stdout.write(`  ${C.red}✕ ${C.reset}${r}\n`);
+      }
+    }
+    process.stdout.write('\n');
     return;
   }
 
@@ -237,11 +269,17 @@ function printTop(rows) {
   process.stdout.write('\n');
 }
 
-function printInspect(col, result, cfg) {
+function printInspect(col, result, cfg, thesis) {
   const d = result.derived;
   process.stdout.write(`\n${C.bold}${col.name || '(unnamed)'}${col.symbol ? ` (${col.symbol})` : ''}${C.reset}  ${col.address}\n`);
   process.stdout.write(`${C.dim}${col.standard || 'unknown standard'} · deployer ${col.owner ? shortAddr(col.owner) : '?'} · age ${fmtAge(d.ageSec)}${C.reset}\n\n`);
-  process.stdout.write(`  ${C.bold}SCORE ${result.score}${C.reset}  tier ${result.tier}  crowd ${pct(result.crowdIndex)}  stealth ×${result.stealthMultiplier}  confidence ${pct(result.confidence)}\n\n`);
+  process.stdout.write(`  ${C.bold}SCORE ${result.score}${C.reset}  tier ${result.tier}  size ${result.size}  crowd ${pct(result.crowdIndex)}  stealth ×${result.stealthMultiplier}  confidence ${pct(result.confidence)}\n`);
+
+  const layerLine = Object.entries(result.layers)
+    .map(([k, v]) => `${v.met ? C.green + '✓' : v.score == null ? C.dim + '·' : C.yellow + '✕'} ${k}${v.score == null ? '' : ` ${(v.score * 100).toFixed(0)}%`}${C.reset}`)
+    .join('   ');
+  process.stdout.write(`  ${C.dim}CONFLUENCE ${result.layersMet}/4${C.reset}  ${layerLine}`);
+  process.stdout.write(result.tierCapped ? `  ${C.yellow}(capped from ${result.rawTier})${C.reset}\n\n` : '\n\n');
 
   if (result.blockers.length) {
     process.stdout.write(`  ${C.red}DISQUALIFIED${C.reset}\n`);
@@ -257,7 +295,22 @@ function printInspect(col, result, cfg) {
 
   process.stdout.write(`\n  ${C.dim}mints ${d.mints} · minters ${d.uniqueMinters} · holders ${d.holders} · secondary ${d.secondary}\n`);
   process.stdout.write(`  rate ${d.mintsPerMin.toFixed(2)}/min (${d.accelRatio.toFixed(2)}× baseline) · top10 ${pct(d.top10Share)} · bulk ${pct(d.bulkShare)}${C.reset}\n`);
-  if (cfg.chain.explorerAddress) process.stdout.write(`  ${cfg.chain.explorerAddress}${col.address}\n`);
+  process.stdout.write(`  flow ${d.absorb?.verdict ?? 'n/a'} · ladder ${d.ladder?.steps?.join(' → ') || 'n/a'}${d.ladder?.monotone ? ' ↑' : ''} · ${d.uniqueBuyers} buyers / ${d.uniqueSellers} sellers${C.reset}\n`);
+
+  if (thesis) {
+    const mark = thesis.status === 'open' ? `${C.green}OPEN${C.reset}` : thesis.status === 'matured' ? `${C.blue}MATURED${C.reset}` : `${C.red}INVALIDATED${C.reset}`;
+    process.stdout.write(`\n  ${C.bold}THESIS ${mark}${C.reset}  opened ${fmtAge(nowSec() - thesis.openedAt)} ago · ${thesis.checks} re-checks\n`);
+    const p = thesisProgress(thesis, d);
+    process.stdout.write(`  ${C.dim}holders ${p.holders}${p.holderMult ? ` (${p.holderMult.toFixed(2)}×)` : ''} · flow ${p.rate} · absorb ${p.absorb} · top10 ${p.top10}${C.reset}\n`);
+    if (thesis.status === 'open') {
+      const i = thesis.invalidation;
+      process.stdout.write(`  ${C.dim}invalidates if: flow < ${i.rateFloor.toFixed(2)}/min · holders < ${i.holderFloor} · top10 > ${pct(i.top10Cap)} · sellers stop being absorbed${C.reset}\n`);
+    } else if (thesis.closeReason) {
+      for (const r of thesis.closeReason) process.stdout.write(`  ${C.red}✕ ${C.reset}${r}\n`);
+    }
+  }
+
+  if (cfg.chain.explorerAddress) process.stdout.write(`\n  ${cfg.chain.explorerAddress}${col.address}\n`);
   process.stdout.write('\n');
 }
 
@@ -287,12 +340,18 @@ async function serve(cfg, port) {
             standard: col.standard,
             score: result.score,
             tier: result.tier,
+            size: result.size,
+            layers: result.layers,
+            layersMet: result.layersMet,
+            tierCapped: result.tierCapped ? result.rawTier : null,
+            thesis: agent.store.theses.get(col.address) || null,
             crowdIndex: result.crowdIndex,
             confidence: result.confidence,
             blockers: result.blockers,
-            parts: result.parts.map((p) => ({ id: p.id, label: p.label, weight: p.weight, score: p.score, note: p.note })),
+            parts: result.parts.map((p) => ({ id: p.id, layer: p.layer, label: p.label, weight: p.weight, score: p.score, note: p.note })),
             d: result.derived,
           })),
+          theses: [...agent.store.theses.values()].sort((a, b) => b.openedAt - a.openedAt).slice(0, 60),
           alerts: agent.store.alerts.slice(-60).reverse(),
         };
         res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' });

@@ -52,13 +52,15 @@ All player ratings are original game values. Built with ❤️ for the Garuda.
 ### 📡 [`hermes/`](hermes/) — NFT alpha detection agent for Robinhood Chain
 
 A separate, self-contained Node CLI that watches Robinhood Chain for NFT
-collections that are working but not yet noticed: it folds every mint into
-rolling per-collection state, scores nine on-chain signals (smart-money
-presence, mint acceleration, organic spread, holder concentration, secondary
-demand, sybil resistance, deployer track record…), and multiplies the result by
-a *stealth* factor that decays as crowd awareness rises — so it goes quiet on a
-collection exactly as everyone else gets loud. Ships with a live dashboard, a
-lookahead-free backtester, and a mock chain for tests. Zero dependencies.
+collections that are working but not yet noticed, and then manages what it
+finds. It folds every mint into rolling per-collection state, scores ten
+on-chain signals across four layers (attention / quality / flow / structure),
+reads **who absorbs the sellers** and whether participation is stepping up leg
+by leg, and requires the layers to *agree* before promoting a call. Every alert
+opens a **thesis** with invalidation levels fixed at entry — flow floor, holder
+floor, distribution cap — re-tested every cycle, so positions exit with a stated
+reason rather than going quiet. Ships with a live dashboard, a lookahead-free
+backtester, and a mock chain for tests. Zero dependencies.
 
 ```bash
 cd hermes && node src/index.js init && node src/index.js doctor

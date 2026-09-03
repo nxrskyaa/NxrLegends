@@ -13,9 +13,35 @@ Zero dependencies, zero build step. Node 20+ and an RPC URL is the whole setup.
 
 ```
 hermes doctor      # is the RPC alive?
-hermes watch       # the normal mode: scan, score, alert, repeat
+hermes watch       # the normal mode: discover, verify, manage, repeat
+hermes theses      # what is currently under management, and what would break it
 hermes serve       # live dashboard at localhost:8787
 ```
+
+## The pipeline
+
+Finding a collection is one step of seven. Hermes runs the whole loop:
+
+```
+DISCOVERY   every mint on the chain, as it lands
+    ↓
+THESIS      why this one? written down, in falsifiable terms
+    ↓
+VERIFY      on-chain only: holders, distribution, wallet quality, structure
+    ↓
+FLOW        velocity ladder + who absorbs the sellers        ← decides timing
+    ↓
+CONFLUENCE  do independent layers agree, or is one signal shouting alone?
+    ↓
+ENTRY+SIZE  evidence quality decides position size, not enthusiasm
+    ↓
+MANAGE      re-test the thesis every cycle → HOLD or EXIT
+```
+
+The last two steps are what separate this from a scanner. Every call opens a
+**thesis** with explicit invalidation levels written at entry; every later cycle
+re-tests them. Collections leave with a stated reason, not by quietly falling
+off a list.
 
 ---
 
@@ -26,20 +52,22 @@ it. A signal with no data returns *nothing* rather than zero, and its weight is
 removed from the denominator — a five-minute-old collection is not punished for
 facts nobody could know yet.
 
-| Signal | Weight | What it reads |
-|---|---:|---|
-| `smart_money` | 26 | Wallets from your registry minting this. The strongest single input. |
-| `mint_acceleration` | 16 | Mints/min **and** whether that rate is climbing vs its own baseline. |
-| `organic_distribution` | 14 | Mints per wallet near ~1.7, low minter Gini, low bulk-tx share. |
-| `holder_spread` | 10 | Top-10 share, biggest whale, how much the creator kept. |
-| `secondary_demand` | 10 | Early resales prove a bid exists; a flood means it's being dumped. |
-| `sybil_resistance` | 8 | Share of minters that are contracts, shrunk toward neutral by sample coverage. |
-| `deployer_pedigree` | 8 | Has this deployer shipped something that worked before? |
-| `supply_scarcity` | 6 | Small cap filling fast beats a 100k free-for-all. |
-| `contract_health` | 6 | Real ERC-721/1155, named, metadata revealed, creator not holding the float. |
+| Signal | Layer | Weight | What it reads |
+|---|---|---:|---|
+| `smart_money` | quality | 26 | Wallets from your registry minting this. The strongest single input. |
+| `mint_acceleration` | attention | 16 | Rate, acceleration vs its own baseline, **and the velocity ladder**. |
+| `organic_distribution` | structure | 14 | Mints per wallet near ~1.7, low minter Gini, low bulk-tx share. |
+| `flow_absorption` | flow | 14 | **Who takes the supply when holders sell.** Abstains until someone sells. |
+| `holder_spread` | structure | 10 | Top-10 share, biggest whale, how much the creator kept. |
+| `secondary_demand` | flow | 8 | Early resales prove a bid exists; a flood means it's being dumped. |
+| `sybil_resistance` | structure | 8 | Share of minters that are contracts, shrunk toward neutral by sample coverage. |
+| `deployer_pedigree` | quality | 8 | Has this deployer shipped something that worked before? |
+| `supply_scarcity` | structure | 6 | Small cap filling fast beats a 100k free-for-all. |
+| `contract_health` | structure | 6 | Real ERC-721/1155, named, metadata revealed, creator not holding the float. |
 
 ```
 score = 100 × (Σ wᵢ·sᵢ / Σ wᵢ) × stealth × confidence
+tier  = capped by how many of the four layers agree
 ```
 
 - **stealth** — `0.35 … 1.15`, driven by holder count and age. This is what makes
@@ -48,6 +76,79 @@ score = 100 × (Σ wᵢ·sᵢ / Σ wᵢ) × stealth × confidence
   never produces a loud call.
 
 Tiers: `WATCH 42` · `SIGNAL 55` · `ALPHA 68` · `URGENT 80`.
+
+### FLOW — the layer that decides timing
+
+Two ideas, neither of which a volume number can express:
+
+**Velocity ladder.** A big 24h figure says nothing about direction. The window is
+split into three legs and the question is whether each leg beat the last —
+`30 → 70 → 140`. A monotone ramp scores 0.92; flat volume at any size scores 0;
+`100 → 50 → 10` scores 0. The step ratios are combined geometrically, so one
+explosive leg cannot paper over a stalled one.
+
+**Seller absorption.** When holders sell, either fresh wallets take the supply or
+it piles back into the same hands while the base shrinks. With no price feed,
+Hermes reads it structurally: unique buyers vs unique sellers, whether the holder
+base widened through the sell pressure, and whether the top-10 share crept up
+while it happened. Verdict is one of `absorbed` / `contested` / `distributing`.
+
+It **abstains** until someone actually sells — an untested market gets no marks
+for passing a test it was never given.
+
+### CONFLUENCE — one loud signal is never enough
+
+Signals are grouped into four layers, each scored as the weighted mean of its
+members that had data:
+
+| Layer | Asks |
+|---|---|
+| `attention` | Is anyone showing up? |
+| `quality` | Is it the *right* someone? |
+| `flow` | Does the bid hold under selling? |
+| `structure` | Is anything structurally wrong? |
+
+The number of layers that clear the floor (0.55) caps the tier: **4 for URGENT,
+3 for ALPHA, 2 for SIGNAL, 1 for WATCH**. A collection with perfect momentum and
+nothing else scores high and still gets capped at `WATCH` — the alert says
+`capped from ALPHA` so you can see it happen.
+
+A layer with no data is never counted as met. With an empty smart-money registry
+the `quality` layer cannot meet, so `URGENT` is unreachable — which is the
+honest outcome when you don't know who is buying.
+
+### ENTRY + SIZING
+
+Evidence quality picks the size, not enthusiasm:
+
+| Size | Requires |
+|---|---|
+| `FULL` | URGENT + all 4 layers + confidence ≥ 80% |
+| `HALF` | ALPHA, or URGENT without full confidence |
+| `SCOUT` | SIGNAL |
+| `NONE` | below SIGNAL |
+
+### MANAGE — price is not the thesis
+
+Every entry writes down its invalidation levels **in absolute terms at entry**,
+so the test cannot drift with the thing it is testing:
+
+```
+invalidates if: flow < 3.42/min · holders < 53 · top10 > 34.5% · sellers stop being absorbed
+```
+
+Each later cycle re-tests them — including for collections that saw no events at
+all, because a thesis dies of silence as readily as of bad news. Four ways out:
+
+- **flow collapsed** — rate fell below the floor, or went silent entirely
+- **holders leaving** — the base is shrinking, not rotating
+- **distribution** — top-10 share climbed past its cap
+- **absorption failed** — sellers are no longer being taken
+
+A drawdown with flow intact, holders intact and sellers still absorbed is **not**
+an exit. Conversely, when the crowd index passes 70% the thesis is marked
+`matured`, not broken: for a pre-crowd strategy, everyone arriving is the thesis
+completing.
 
 ### Hard filters run first
 
@@ -109,6 +210,8 @@ hermes watch                       # continuous; SIGINT saves state cleanly
 hermes scan                        # one cycle, then print the ranking
 hermes top --n 20 --tier SIGNAL    # rank what's already in state
 hermes inspect 0xCOLLECTION        # full per-signal breakdown for one collection
+hermes theses                      # what is under management + what would break it
+hermes theses --all                # including closed ones, with their exit reasons
 hermes serve --port 8787           # dashboard + JSON API
 ```
 
@@ -134,15 +237,44 @@ erc721 · deployer 0x0000…dcc8 · age 33m
         secondary 7.3% of mints, first at 9m
 ```
 
+```
+Hermes Test Alpha 0x0000…d8e1
+  open  ALPHA 77.6  size HALF  confluence 3/4  opened 12m ago  9 re-checks
+  ↳ Smart money present: 3 tracked wallet(s), weight 3.00
+  ↳ Sellers being absorbed: absorbed — 14 buyers vs 14 sellers, holders +24
+  ↳ Organic mint spread: 49 minters, 3.90/wallet, gini 0.06
+  holders 63 → 141 (2.24×) · flow 13.67 → 9.20/min · absorb absorbed → absorbed · top10 22.5% → 24.1%
+  invalidates if: flow < 3.42/min · holders < 53 · top10 > 34.5% · sellers stop being absorbed
+```
+
 ### Alerts
+
+Four kinds, each with its own meaning:
+
+| Kind | When |
+|---|---|
+| `▲ ENTRY` | a thesis opened |
+| `▲ UPGRADE` | still valid, evidence got stronger |
+| `▼ THESIS BROKEN` | an invalidation level was hit — with the reason |
+| `● THESIS PLAYED OUT` | crowd arrived; no longer early |
+
+```
+▲ ENTRY [URGENT 85.3] Hermes Test Alpha (HTA) 0x0000…d8e1  size:FULL
+  age 29m · 191 mints / 49 minters / 63 holders · 12.73/min (21.22× base) · flow absorbed · crowd 7.0%
+  confluence 4/4: attention quality flow structure
+  ↳ Smart money present: 3 tracked wallet(s), weight 3.00
+  ↳ Mint velocity accelerating: 12.73/min, 21.22× baseline, ladder 3 → 63 → 139 ↑
+  ↳ Sellers being absorbed: absorbed — 14 buyers vs 14 sellers, holders +60
+  invalidates if: flow < 3.42/min · holders < 53 · top10 > 34.5% · sellers stop being absorbed
+```
 
 Console always. Beyond that, fill in any of `alerts.discordWebhookUrl`,
 `alerts.telegram`, or a generic `alerts.webhookUrl`; every alert is also
-appended to `state/alerts.jsonl`. Each one carries the top three signal
-contributions as its `why` — an alert you cannot audit is noise.
+appended to `state/alerts.jsonl`. An alert you cannot audit is noise, so each
+one carries its drivers, its confluence, and its invalidation levels.
 
-One alert per collection per tier upgrade, with a cooldown (default 30 min) to
-stop a single hot mint from flooding the channel.
+After an exit, a collection cannot be re-entered for `thesis.reopenCooldownSec`
+(default 2h) — no walking straight back into something that just broke.
 
 ---
 
@@ -179,12 +311,19 @@ after the detection block. Move weights in `weights` and thresholds in
 node test/run.js
 ```
 
-22 checks against a synthetic Robinhood-Chain-shaped RPC (`test/mockchain.js`)
+49 checks against a synthetic Robinhood-Chain-shaped RPC (`test/mockchain.js`)
 carrying an organic launch, a whale self-mint, a bot farm, and an ERC-20 decoy.
 It asserts the things that are easy to get quietly wrong: that a 3-topic ERC-20
 `Transfer` is never mistaken for an NFT, that the holder ledger always balances
 against supply, that the whale is disqualified, that the bot farm scores below
 the organic launch, and that state survives a save/reload round trip.
+
+The flow, confluence and thesis layers are covered directly: that flat volume
+scores zero at any size, that one explosive leg cannot mask a stalled one, that
+the same sell volume scores worse when supply concentrates, that one loud signal
+cannot reach ALPHA alone, that a strong member cannot carry a weak layer, and —
+the load-bearing one — that **a drawdown with flow intact does not break a
+thesis** while holders leaving, distribution or failed absorption each do.
 
 ---
 
@@ -197,8 +336,11 @@ src/rpc.js         JSON-RPC: throttled, retrying, batching, auto-splits log rang
 src/chain.js       contract probing (ERC-165, metadata, batched EOA-vs-contract)
 src/events.js      log → normalized mint / transfer / burn
 src/collection.js  rolling per-collection state and derived metrics
-src/signals.js     the nine signals + the stealth multiplier
-src/score.js       weighted composition, tiering, driver attribution
+src/signals.js     the ten signals + the stealth multiplier
+src/flow.js        velocity ladder + seller absorption
+src/confluence.js  layer scoring, tier capping, position sizing
+src/thesis.js      open / re-test / invalidate, with entry-fixed levels
+src/score.js       weighted composition, confluence gate, driver attribution
 src/filters.js     hard disqualifiers
 src/wallets.js     smart-money registry + `learn` from past winners
 src/store.js       atomic JSON state
@@ -211,7 +353,9 @@ test/              mock chain + end-to-end checks
 A cycle is: pull every chain-wide mint log → pull all movement for tracked
 collections → go back for the non-mint history of collections discovered *in
 this same range* (otherwise a first sweep sees zero secondary flow) → fold into
-state → probe the top candidates → score → alert → advance the cursor and save.
+state → probe the top candidates → score → apply the confluence gate → open or
+re-test theses (including for collections with no events this range) → alert →
+advance the cursor and save.
 
 ---
 
@@ -221,9 +365,14 @@ state → probe the top candidates → score → alert → advance the cursor an
   mint cost in USD and marketplace listings need a marketplace API that isn't
   wired up — `chain.marketplaceCollection` only builds links today. Adding a
   price feed is the single highest-value extension.
-- **No social layer.** "Crowd awareness" is inferred from on-chain holder growth
-  and age, not from mentions. A collection being farmed quietly in a paid
-  Discord will look stealthier than it is.
+- **No social layer.** Discovery is on-chain only — Hermes sees the mint, not the
+  callout that caused it. "Crowd awareness" is inferred from holder growth and
+  age, not mentions, so a collection farmed quietly in a paid Discord looks
+  stealthier than it is. Wiring a mentions feed into an `attention` signal is
+  the obvious next slot; the layer already exists.
+- **Absorption is structural, not priced.** It reads buyers, sellers, holder
+  delta and concentration — it cannot tell a 5% dip absorbed at the bid from a
+  40% one. With a price feed the same function gets much sharper.
 - **Deployer identity is approximated** by `owner()`. A contract with renounced
   or unusual ownership reports no deployer, and `deployer_pedigree` abstains.
 - **The registry is the ceiling.** With an empty smart-money list the strongest
@@ -232,5 +381,5 @@ state → probe the top candidates → score → alert → advance the cursor an
   reasoned from how launches behave generally and verified against a synthetic
   chain. Run `backtest` on real history before trusting a tier.
 
-None of this is financial advice, and a high score is a reason to look, not a
-reason to buy.
+None of this is financial advice. A high score is a reason to look; the thesis
+and its invalidation levels are what you actually act on.
