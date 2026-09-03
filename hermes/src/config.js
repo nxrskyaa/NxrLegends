@@ -81,13 +81,22 @@ export const DEFAULTS = {
     forgetAfterSec: 259200,
     maxTracked: 3000,
   },
+  telegram: {
+    enabled: false,
+    botToken: '',
+    chatId: '',
+    allowFrom: [], // extra chat ids allowed to send commands
+    commands: true, // false = push alerts only, ignore incoming messages
+    pollTimeoutSec: 30,
+    apiBase: 'https://api.telegram.org', // override only for testing
+  },
   alerts: {
+    muted: false,
     minTier: 'SIGNAL',
     reAlertOnUpgrade: true,
     cooldownSec: 1800,
     webhookUrl: '',
     discordWebhookUrl: '',
-    telegram: { botToken: '', chatId: '' },
     jsonlFile: 'state/alerts.jsonl',
   },
   blocklist: [],
@@ -116,8 +125,20 @@ export function loadConfig(file) {
   if (process.env.HERMES_RPC_URL) cfg.chain.rpcUrl = process.env.HERMES_RPC_URL;
   if (process.env.HERMES_DISCORD_WEBHOOK) cfg.alerts.discordWebhookUrl = process.env.HERMES_DISCORD_WEBHOOK;
   if (process.env.HERMES_WEBHOOK) cfg.alerts.webhookUrl = process.env.HERMES_WEBHOOK;
-  if (process.env.HERMES_TELEGRAM_TOKEN) cfg.alerts.telegram.botToken = process.env.HERMES_TELEGRAM_TOKEN;
-  if (process.env.HERMES_TELEGRAM_CHAT) cfg.alerts.telegram.chatId = process.env.HERMES_TELEGRAM_CHAT;
+  if (process.env.HERMES_TELEGRAM_TOKEN) {
+    cfg.telegram.botToken = process.env.HERMES_TELEGRAM_TOKEN;
+    cfg.telegram.enabled = true;
+  }
+  if (process.env.HERMES_TELEGRAM_CHAT) cfg.telegram.chatId = process.env.HERMES_TELEGRAM_CHAT;
+
+  // A token in the older alerts.telegram slot still works.
+  const legacy = cfg.alerts?.telegram;
+  if (legacy?.botToken && !cfg.telegram.botToken) {
+    cfg.telegram.botToken = legacy.botToken;
+    cfg.telegram.chatId = cfg.telegram.chatId || legacy.chatId || '';
+    cfg.telegram.enabled = true;
+  }
+  if (cfg.telegram.botToken && cfg.telegram.chatId) cfg.telegram.enabled = true;
 
   cfg.__file = p;
   cfg.blocklist = (cfg.blocklist || []).map((a) => a.toLowerCase());

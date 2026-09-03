@@ -11,6 +11,7 @@ import { TOPIC } from './abi.js';
 import { scoreCollection, TIER_ORDER } from './score.js';
 import { openThesis, evaluateThesis } from './thesis.js';
 import { buildAlert, dispatch, meetsTier, colors as C } from './notify.js';
+import { TelegramBot } from './telegram.js';
 import { chunk, sleep, groupBy, nowSec } from './util.js';
 
 export class Agent {
@@ -310,11 +311,32 @@ export class Agent {
     return fired;
   }
 
+  /** Starts the Telegram bot alongside the scan loop, if one is configured. */
+  async startTelegram() {
+    if (!this.cfg.telegram?.enabled || !this.cfg.telegram?.botToken) return null;
+    this.telegram = new TelegramBot(this.cfg, this);
+    if (this.cfg.telegram.commands === false) {
+      this.log('telegram: push-only (commands disabled in config)');
+      return null;
+    }
+    try {
+      const me = await this.telegram.start();
+      this.log(`telegram: @${me.username} listening${this.telegram.allow.size ? '' : ` ${C.yellow}(no chatId set — message the bot to get yours)${C.reset}`}`);
+      return me;
+    } catch (e) {
+      this.log(`${C.red}telegram failed to start:${C.reset} ${e.message}`);
+      this.telegram = null;
+      return null;
+    }
+  }
+
   async watch({ once = false } = {}) {
     this.running = true;
+    await this.startTelegram();
     const stop = () => {
       this.log('shutting down, saving state…');
       this.running = false;
+      this.telegram?.stop();
       this.store.save();
       process.exit(0);
     };

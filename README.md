@@ -59,8 +59,9 @@ reads **who absorbs the sellers** and whether participation is stepping up leg
 by leg, and requires the layers to *agree* before promoting a call. Every alert
 opens a **thesis** with invalidation levels fixed at entry — flow floor, holder
 floor, distribution cap — re-tested every cycle, so positions exit with a stated
-reason rather than going quiet. Ships with a live dashboard, a lookahead-free
-backtester, and a mock chain for tests. Zero dependencies.
+reason rather than going quiet. Ships with a **two-way Telegram bot** (ask it
+`/top`, `/theses`, `/i 0x…` from your phone), a live dashboard, a lookahead-free
+backtester, and mock chain + mock Bot API for tests. Zero dependencies.
 
 ```bash
 cd hermes && node src/index.js init && node src/index.js doctor

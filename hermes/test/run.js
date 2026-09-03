@@ -13,6 +13,9 @@ import { stealth } from '../src/signals.js';
 import { velocityLadder, absorption, isFlowDead } from '../src/flow.js';
 import { layerScores, capTier, sizing } from '../src/confluence.js';
 import { openThesis, evaluateThesis } from '../src/thesis.js';
+import { TelegramBot } from '../src/telegram.js';
+import { startMockTelegram } from './mocktelegram.js';
+import { buildAlert, dispatch } from '../src/notify.js';
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-test-'));
 let passed = 0;
@@ -340,6 +343,127 @@ check('an open thesis protects its collection from pruning', () => {
   thAgent.store.prune(Math.floor(Date.now() / 1000), cfg);
   assert.ok(thAgent.store.collections.has(FIXTURES.organic), 'pruned a collection under management');
 });
+
+process.stdout.write('\ntelegram bot\n');
+const tg = await startMockTelegram();
+const tgCfg = {
+  ...cfg,
+  paths: { ...cfg.paths, state: path.join(tmp, 'thesis.json') },
+  telegram: { enabled: true, botToken: 'test:token', chatId: '999', allowFrom: [], commands: true, pollTimeoutSec: 0, apiBase: tg.url },
+  alerts: { ...cfg.alerts, jsonlFile: '', muted: false },
+};
+const tgAgent = new Agent(tgCfg);
+const bot = new TelegramBot(tgCfg, tgAgent);
+const me = await bot.start();
+
+check('the bot identifies itself and registers its commands', () => {
+  assert.equal(me.username, 'hermes_test_bot');
+  assert.ok(tg.state.commandsSet.some((c) => c.command === 'theses'));
+});
+
+tg.say('/status');
+await tg.waitForSent(1);
+check('/status reports chain position and what is tracked', () => {
+  const t = tg.lastText();
+  assert.match(t, /Hermes/);
+  assert.match(t, /tracking/);
+  assert.match(t, /open theses/);
+});
+
+tg.say('/top 3');
+await tg.waitForSent(2);
+check('/top lists candidates with tappable inspect links', () => {
+  const t = tg.lastText();
+  assert.match(t, new RegExp(`/i_${FIXTURES.organic}`));
+  assert.match(t, /Hermes Test Alpha/);
+});
+
+tg.say('/theses');
+await tg.waitForSent(3);
+check('/theses shows what is managed and its exit conditions', () => {
+  const t = tg.lastText();
+  assert.match(t, /exits if/);
+  assert.match(t, /holders/);
+});
+
+tg.say(`/i_${FIXTURES.organic}`);
+await tg.waitForSent(4);
+check('a tapped /i_0x… link returns the full breakdown', () => {
+  const t = tg.lastText();
+  assert.match(t, /Smart money present|Organic mint spread/);
+  assert.match(t, /confluence \d\/4/);
+  assert.ok(t.includes(FIXTURES.organic));
+});
+
+tg.say('/i 0xdeadbeef');
+await tg.waitForSent(5);
+check('a malformed address is refused politely', () => assert.match(tg.lastText(), /Give me an address/));
+
+tg.say('/tier ALPHA');
+await tg.waitForSent(6);
+check('/tier changes the live alert threshold', () => {
+  assert.equal(tgCfg.alerts.minTier, 'ALPHA');
+  assert.match(tg.lastText(), /ALPHA/);
+});
+
+tg.say('/mute');
+await tg.waitForSent(7);
+const beforeMute = tg.state.sent.length;
+await dispatch(buildAlert(tgAgent.store.collections.get(FIXTURES.organic), { ...(await tgAgent.scoreAll([tgAgent.store.collections.get(FIXTURES.organic)]))[0].result }, tgCfg, { kind: 'ENTRY' }), tgCfg);
+check('a muted agent sends nothing to telegram', () => assert.equal(tg.state.sent.length, beforeMute));
+
+tg.say('/unmute');
+await tg.waitForSent(beforeMute + 1);
+const beforeAlert = tg.state.sent.length;
+const alertResult = (await tgAgent.scoreAll([tgAgent.store.collections.get(FIXTURES.organic)]))[0];
+await dispatch(buildAlert(alertResult.col, alertResult.result, tgCfg, { kind: 'ENTRY', thesis: tgAgent.store.theses.get(FIXTURES.organic) }), tgCfg);
+check('an unmuted alert reaches telegram with its exit levels', () => {
+  assert.equal(tg.state.sent.length, beforeAlert + 1);
+  const m = tg.state.sent[tg.state.sent.length - 1];
+  assert.equal(m.parse_mode, 'HTML');
+  assert.match(m.text, /exits if/);
+  assert.match(m.text, new RegExp(`/i_${FIXTURES.organic}`));
+  assert.ok(m.reply_markup.inline_keyboard[0].some((b) => b.text === 'Explorer'));
+});
+
+const col = tgAgent.store.collections.get(FIXTURES.organic);
+const realName = col.name;
+col.name = '<b>pwn</b> & <a href="http://evil">co</a>';
+const escBefore = tg.state.sent.length;
+await dispatch(buildAlert(col, alertResult.result, tgCfg, { kind: 'ENTRY' }), tgCfg);
+col.name = realName;
+check('a hostile collection name cannot inject markup into telegram', () => {
+  const sentText = tg.state.sent[tg.state.sent.length - 1].text;
+  assert.equal(tg.state.sent.length, escBefore + 1);
+  assert.ok(!sentText.includes('<b>pwn</b>'), 'raw tags reached telegram');
+  assert.ok(!sentText.includes('<a href'), 'a live anchor tag reached telegram');
+  assert.ok(sentText.includes('&lt;a href'), 'the anchor was not escaped');
+  assert.ok(sentText.includes('&lt;b&gt;pwn&lt;/b&gt;'), 'name was not escaped');
+  assert.ok(sentText.includes('&amp;'), 'ampersand was not escaped');
+});
+
+const outsiderBefore = tg.state.sent.length;
+tg.say('/top', '123456');
+await new Promise((r) => setTimeout(r, 300));
+check('a stranger gets no data once a chatId is configured', () => {
+  assert.equal(tg.state.sent.length, outsiderBefore, 'bot replied to an unauthorised chat');
+});
+
+bot.stop();
+
+const openBot = new TelegramBot({ ...tgCfg, telegram: { ...tgCfg.telegram, chatId: '', allowFrom: [] } }, tgAgent);
+await openBot.start();
+const onboardBefore = tg.state.sent.length;
+tg.say('/top', '777');
+await tg.waitForSent(onboardBefore + 1);
+check('before setup the bot only ever hands back your chat id', () => {
+  const t = tg.lastText();
+  assert.match(t, /chat id/);
+  assert.match(t, /777/);
+  assert.ok(!/Hermes Test Alpha/.test(t), 'leaked collection data before setup');
+});
+openBot.stop();
+tg.server.close();
 
 server.close();
 process.stdout.write(`\n${passed} checks passed${process.exitCode ? ' (with failures)' : ''}\n`);

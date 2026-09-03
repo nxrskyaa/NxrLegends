@@ -11,6 +11,7 @@ import { Agent } from './agent.js';
 import { backtest, renderBacktest } from './backtest.js';
 import { scoreCollection } from './score.js';
 import { thesisProgress } from './thesis.js';
+import { TelegramBot } from './telegram.js';
 import { colors as C } from './notify.js';
 import { nowSec, shortAddr, pct, fmtAge, isAddr } from './util.js';
 
@@ -49,6 +50,8 @@ ${C.bold}Hermes${C.reset} — NFT alpha detection agent for Robinhood Chain
                                        build the registry from collections that already worked
   hermes backtest --from N --to N [--cycle 500] [--horizon 5000] [--tier SIGNAL] [--target 3]
   hermes serve [--port 8787]           dashboard + JSON API over the local state
+  hermes telegram                      run only the Telegram bot against saved state
+  hermes telegram --whoami             print the bot's identity and your chat id
 
   global: --config path/to/hermes.config.json
 `;
@@ -241,6 +244,35 @@ async function main() {
     });
     process.stdout.write(renderBacktest(res) + '\n');
     if (args.json) fs.writeFileSync(String(args.json), JSON.stringify(res, null, 2));
+    return;
+  }
+
+  if (cmd === 'telegram') {
+    const agent = new Agent(cfg);
+    const bot = new TelegramBot(cfg, agent);
+    if (!bot.configured) {
+      process.stderr.write(
+        `${C.red}No bot token.${C.reset}\n\n` +
+          `1. Open Telegram, message @BotFather, send /newbot, follow the prompts.\n` +
+          `2. It gives you a token like 8123456789:AA...\n` +
+          `3. Put it in ${cfg.__file} under telegram.botToken\n` +
+          `4. Run this again, then message your bot — it will reply with your chat id.\n`
+      );
+      process.exit(1);
+    }
+    const me = await bot.start();
+    process.stdout.write(`Bot @${me.username} is listening.\n`);
+    if (!bot.allow.size) {
+      process.stdout.write(`${C.yellow}No telegram.chatId set yet — message your bot now and it will reply with your chat id.${C.reset}\n`);
+    }
+    if (args.whoami) {
+      process.stdout.write(`id ${me.id} · name ${me.first_name}\nallowed chats: ${[...bot.allow].join(', ') || '(none yet)'}\n`);
+    }
+    process.stdout.write(`${C.dim}Ctrl-C to stop. Note: this serves saved state only — run \`hermes watch\` for live scanning plus the bot.${C.reset}\n`);
+    process.on('SIGINT', () => {
+      bot.stop();
+      process.exit(0);
+    });
     return;
   }
 

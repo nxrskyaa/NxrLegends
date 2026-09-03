@@ -259,6 +259,43 @@ Hermes Test Alpha 0x0000…d8e1
   invalidates if: flow < 3.42/min · holders < 53 · top10 > 34.5% · sellers stop being absorbed
 ```
 
+### Telegram
+
+Two-way: alerts go out, and you can ask it things back from your phone.
+
+**Setup, once:**
+
+1. In Telegram, message **@BotFather** → `/newbot` → pick a name. It hands you a
+   token like `8123456789:AA…`.
+2. Put the token in `hermes.config.json` under `telegram.botToken`.
+3. Run `hermes telegram`, then message your bot. It replies with your chat id —
+   put that in `telegram.chatId` and restart.
+
+From then on `hermes watch` runs the scanner and the bot together in one
+process. `hermes telegram` on its own serves saved state without scanning.
+
+| Command | |
+|---|---|
+| `/status` | where the agent is in the chain, what it's tracking |
+| `/top` · `/top 5` | best candidates right now |
+| `/theses` | what's under management + what would break each one |
+| `/i 0x…` | full per-signal breakdown for one collection |
+| `/wallets` | the smart-money registry |
+| `/tier ALPHA` | raise or lower the alert threshold live |
+| `/mute` · `/unmute` | stop or resume alerts (the agent keeps working) |
+
+Every alert ends with a tappable `/i_0x…` shortcut, so the full breakdown is one
+thumb press away.
+
+Long polling, not webhooks — no domain, no TLS certificate, no port forwarding.
+It runs from a laptop behind NAT.
+
+**Access.** Only the configured `chatId` (plus anything in `telegram.allowFrom`)
+gets answers. Before a `chatId` is set the bot replies to *any* chat with one
+thing only — that chat's id — so onboarding works without leaving the bot open.
+Collection names are HTML-escaped on the way out, so a contract named
+`<b>…</b>` cannot inject markup into your feed.
+
 ### Alerts
 
 Four kinds, each with its own meaning:
@@ -323,7 +360,7 @@ after the detection block. Move weights in `weights` and thresholds in
 node test/run.js
 ```
 
-49 checks against a synthetic Robinhood-Chain-shaped RPC (`test/mockchain.js`)
+61 checks against a synthetic Robinhood-Chain-shaped RPC (`test/mockchain.js`)
 carrying an organic launch, a whale self-mint, a bot farm, and an ERC-20 decoy.
 It asserts the things that are easy to get quietly wrong: that a 3-topic ERC-20
 `Transfer` is never mistaken for an NFT, that the holder ledger always balances
@@ -336,6 +373,13 @@ the same sell volume scores worse when supply concentrates, that one loud signal
 cannot reach ALPHA alone, that a strong member cannot carry a weak layer, and —
 the load-bearing one — that **a drawdown with flow intact does not break a
 thesis** while holders leaving, distribution or failed absorption each do.
+
+The Telegram bot is driven end to end against a mock Bot API
+(`test/mocktelegram.js`): fake user messages go in, the bot's replies come back
+out. It asserts that every command answers, that a stranger gets nothing once a
+chat id is configured, that an unconfigured bot hands back only your chat id and
+never collection data, and that a collection named `<b>pwn</b>` cannot inject
+markup into a message.
 
 ---
 
@@ -357,6 +401,7 @@ src/filters.js     hard disqualifiers
 src/wallets.js     smart-money registry + `learn` from past winners
 src/store.js       atomic JSON state
 src/notify.js      console / jsonl / webhook / Discord / Telegram
+src/telegram.js    two-way bot: long-polling commands over the live agent
 src/backtest.js    lookahead-free replay with outcome measurement
 dashboard/         live radar UI (served by `hermes serve`)
 test/              mock chain + end-to-end checks

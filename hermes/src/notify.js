@@ -123,10 +123,15 @@ async function post(url, body, headers = {}) {
   }
 }
 
+const escHtml = (s) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
 export async function dispatch(alert, cfg) {
   process.stdout.write(renderConsole(alert) + '\n\n');
 
   const a = cfg.alerts || {};
+  // Muting silences the outside world only — the agent keeps working and the
+  // console keeps printing.
+  if (a.muted) return;
 
   if (a.jsonlFile) {
     const p = path.resolve(a.jsonlFile);
@@ -164,19 +169,44 @@ export async function dispatch(alert, cfg) {
     });
   }
 
-  if (a.telegram?.botToken && a.telegram?.chatId) {
-    const text =
-      `*${KIND_LABEL[alert.kind] || alert.kind}* — *${alert.tier} ${alert.score}* ${alert.name}\n` +
-      `\`${alert.address}\`\n` +
-      `${alert.stats.mints} mints · ${alert.stats.uniqueMinters} minters · ${alert.stats.mintsPerMin}/min (${alert.stats.accelRatio}×)\n` +
-      `age ${alert.age} · crowd ${pct(alert.crowdIndex)}\n\n` +
-      (alert.reasons.length ? alert.reasons : alert.why).map((w) => `• ${w}`).join('\n') +
-      (alert.links.explorer ? `\n\n${alert.links.explorer}` : '');
-    await post(`https://api.telegram.org/bot${a.telegram.botToken}/sendMessage`, {
-      chat_id: a.telegram.chatId,
-      text,
-      parse_mode: 'Markdown',
+  const tg = cfg.telegram?.botToken ? cfg.telegram : a.telegram;
+  if (tg?.botToken && tg?.chatId) {
+    const icon = { ENTRY: '🟢', UPGRADE: '⬆️', INVALIDATED: '🔴', MATURED: '🔵' }[alert.kind] || '•';
+    const lines = alert.reasons.length ? alert.reasons : alert.why;
+    const closing = alert.kind === 'INVALIDATED' || alert.kind === 'MATURED';
+
+    let text =
+      `${icon} <b>${escHtml(KIND_LABEL[alert.kind] || alert.kind)}</b>\n` +
+      `<b>${escHtml(alert.tier)} ${alert.score}</b> · ${escHtml(alert.name)}${alert.symbol ? ` (${escHtml(alert.symbol)})` : ''}` +
+      (!closing && alert.size !== 'NONE' ? ` · size <b>${escHtml(alert.size)}</b>` : '') +
+      `\n<code>${escHtml(alert.address)}</code>\n\n` +
+      `<i>${alert.stats.mints} mints · ${alert.stats.uniqueMinters} minters · ${alert.stats.holders} holders\n` +
+      `${alert.stats.mintsPerMin}/min (${alert.stats.accelRatio}× base) · ${escHtml(alert.stats.absorb ?? 'no flow yet')}\n` +
+      `confluence ${alert.layersMet}/4 · crowd ${pct(alert.crowdIndex)} · age ${escHtml(alert.age)}</i>\n\n` +
+      lines.map((w) => `${closing ? '✕' : '↳'} ${escHtml(w)}`).join('\n');
+
+    if (alert.progress) {
+      text +=
+        `\n\n<i>since entry: holders ${escHtml(alert.progress.holders)}` +
+        (alert.progress.holderMult ? ` (${alert.progress.holderMult.toFixed(2)}×)` : '') +
+        ` · flow ${escHtml(alert.progress.rate)} · ${escHtml(alert.progress.absorb)}</i>`;
+    }
+    if (alert.invalidation && !closing) {
+      text += `\n\n<i>exits if: ${alert.invalidation.map(escHtml).join(' · ')}</i>`;
+    }
+    // Tappable in the Telegram client — one thumb press for the full breakdown.
+    text += `\n\n/i_${alert.address}`;
+
+    const buttons = [];
+    if (alert.links.explorer) buttons.push({ text: 'Explorer', url: alert.links.explorer });
+    if (alert.links.market) buttons.push({ text: 'Market', url: alert.links.market });
+
+    await post(`${tg.apiBase || 'https://api.telegram.org'}/bot${tg.botToken}/sendMessage`, {
+      chat_id: tg.chatId,
+      text: text.slice(0, 4000),
+      parse_mode: 'HTML',
       disable_web_page_preview: true,
+      ...(buttons.length ? { reply_markup: { inline_keyboard: [buttons] } } : {}),
     });
   }
 }
