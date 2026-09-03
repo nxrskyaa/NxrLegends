@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { loadConfig, DEFAULTS } from './config.js';
 import { Agent } from './agent.js';
@@ -33,6 +34,7 @@ function parseArgs(argv) {
 const USAGE = `
 ${C.bold}Hermes${C.reset} — NFT alpha detection agent for Robinhood Chain
 
+  hermes demo                          run the whole agent on a built-in fake chain (no setup needed)
   hermes init                          write a starter hermes.config.json
   hermes doctor                        check RPC connectivity and chain head
   hermes scan [--once]                 run a single scan cycle
@@ -71,6 +73,11 @@ async function main() {
     seed.chain.rpcUrl = seed.chain.rpcUrl || 'https://<your-robinhood-chain-rpc>';
     fs.writeFileSync(target, JSON.stringify(seed, null, 2));
     process.stdout.write(`wrote ${target}\nSet chain.rpcUrl, then run: hermes doctor\n`);
+    return;
+  }
+
+  if (cmd === 'demo') {
+    await demo();
     return;
   }
 
@@ -244,6 +251,65 @@ async function main() {
 
   process.stderr.write(`unknown command: ${cmd}\n${USAGE}`);
   process.exit(1);
+}
+
+/**
+ * A full run against the built-in fake chain, so you can see what the agent
+ * does before wiring up a real RPC. Nothing is written outside a temp folder.
+ */
+async function demo() {
+  const { startMock, FIXTURES, RANGE } = await import('../test/mockchain.js');
+  const { server, url } = await startMock();
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'hermes-demo-'));
+
+  const cfg = loadConfig(path.join(tmp, 'none.json'));
+  cfg.chain.name = 'Demo Chain (fake)';
+  cfg.chain.rpcUrl = url;
+  cfg.scan.startBlock = RANGE.START;
+  cfg.scan.maxBlocksPerCycle = 2000;
+  cfg.scan.rps = 1000;
+  cfg.paths.state = path.join(tmp, 'state.json');
+  cfg.paths.wallets = path.join(tmp, 'wallets.json');
+  cfg.alerts.jsonlFile = '';
+  cfg.alerts.minTier = 'WATCH';
+
+  const say = (t) => process.stdout.write(t + '\n');
+  say(`\n${C.bold}Hermes demo${C.reset} — a fake chain with four things happening on it:`);
+  say(`${C.dim}  1. a real-looking launch: ~50 different wallets minting, rate speeding up`);
+  say(`  2. a whale: one wallet minting 400 to itself`);
+  say(`  3. a bot farm: 180 contract wallets taking exactly one each`);
+  say(`  4. an ERC-20 token, to check it is never mistaken for an NFT${C.reset}\n`);
+
+  const agent = new Agent(cfg);
+  say(`${C.dim}Seeding 3 wallets as "smart money" (in real use these come from past winners)…${C.reset}`);
+  for (const w of FIXTURES.smart) agent.wallets.add(w, { tier: 'S', note: 'demo' });
+  agent.wallets.save();
+
+  say(`${C.dim}Scanning blocks ${RANGE.START}–${RANGE.END}…${C.reset}\n`);
+  const r = await agent.cycle();
+
+  say(`${C.bold}What it found${C.reset}`);
+  printTop(r.results);
+
+  say(`${C.bold}What it is now managing${C.reset}`);
+  for (const t of agent.store.theses.values()) {
+    const col = agent.store.collections.get(t.address);
+    say(`\n  ${C.bold}${t.name}${C.reset} — ${t.tier} ${t.score}, suggested size ${C.bold}${t.size}${C.reset}, ${t.layersMet}/4 layers agree`);
+    for (const w of t.why) say(`  ${C.dim}↳ ${w.label}: ${w.note}${C.reset}`);
+    const i = t.invalidation;
+    say(`  ${C.dim}it will call this off if: flow < ${i.rateFloor.toFixed(2)}/min · holders < ${i.holderFloor} · top10 > ${pct(i.top10Cap)} · sellers stop being absorbed${C.reset}`);
+  }
+
+  const rejected = r.results.filter((x) => x.result.blockers.length);
+  if (rejected.length) {
+    say(`\n${C.bold}What it threw out${C.reset}`);
+    for (const { col, result } of rejected) say(`  ${C.dim}${col.name || col.address} — ${result.blockers.join('; ')}${C.reset}`);
+  }
+
+  say(`\n${C.dim}That was fake data. To run this for real: ${C.reset}hermes init${C.dim}, put an RPC URL in the file, then ${C.reset}hermes doctor${C.dim}.${C.reset}\n`);
+
+  server.close();
+  fs.rmSync(tmp, { recursive: true, force: true });
 }
 
 function requireRpc(cfg) {

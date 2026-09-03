@@ -12,7 +12,8 @@ as everyone else gets louder.
 Zero dependencies, zero build step. Node 20+ and an RPC URL is the whole setup.
 
 ```
-hermes doctor      # is the RPC alive?
+hermes demo        # see it work right now, on a built-in fake chain — no setup
+hermes doctor      # is your RPC alive?
 hermes watch       # the normal mode: discover, verify, manage, repeat
 hermes theses      # what is currently under management, and what would break it
 hermes serve       # live dashboard at localhost:8787
@@ -160,6 +161,17 @@ not silently dropped, so you can see what was rejected and why.
 ---
 
 ## Setup
+
+Try it with no setup at all first — this runs the whole agent against a
+built-in fake chain and prints what it found, what it is managing, and what it
+threw out:
+
+```bash
+cd hermes
+node src/index.js demo
+```
+
+Then for real:
 
 ```bash
 cd hermes
